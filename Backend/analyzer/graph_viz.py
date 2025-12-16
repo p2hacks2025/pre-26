@@ -10,74 +10,66 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 
+# ローカルでベクトル化するためのライブラリ
+from sentence_transformers import SentenceTransformer
+
 # --- 1. 環境設定 ---
 load_dotenv()
 
-# 日本語フォント設定 (WindowsはMS Gothic)
+# 日本語フォント設定
 plt.rcParams['font.family'] = 'MS Gothic'
 
-# --- ★ここを修正しました★ ---
+# --- 2. モデル設定 ---
 
-# 埋め込みモデル (Embedding): 'E5-large' (精度が高く、APIも安定しています)
-# 元のMiniLMが410エラーで消滅したため変更
-EMBED_API_URL = "https://api-inference.huggingface.co/models/intfloat/multilingual-e5-large"
+# 【Embedding】ローカル実行用モデル
+# APIエラー(410 Gone)を避けるため、ローカルで動かします
+LOCAL_EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-# 生成モデル (Text Generation): 'Zephyr-7b-beta' (Mistralベースで日本語に強く、利用規約同意なしですぐ使えます)
-# 元のMistral-v0.3は権限エラーが出るため変更
-GEN_API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
+GEN_API_URL = "https://router.huggingface.co/hf-inference/models/Qwen/Qwen2.5-7B-Instruct"
 
-# -----------------------------
-
-# --- 2. API関連関数 ---
+# --- 3. 関数定義 ---
 
 def get_hf_headers():
     token = os.getenv("HF_TOKEN")
     if not token:
-        raise ValueError("【エラー】環境変数 'HF_TOKEN' が読み込めませんでした。.envファイルを確認してください。")
+        print("Warning: HF_TOKEN not found. 生成AI機能は使えません。")
+        return {}
     return {"Authorization": f"Bearer {token}"}
 
-def get_embeddings(texts):
-    """テキストをベクトル化"""
+def get_embeddings_local(texts):
+    """ローカルのSentenceTransformerでベクトル化"""
     if not texts: return []
-    headers = get_hf_headers()
     
-    # E5モデルは "query: " という接頭辞をつけるのが作法ですが、
-    # 簡易的にそのまま投げても動きます。今回はそのまま投げます。
-    payload = {"inputs": texts, "options": {"wait_for_model": True}}
-    
+    print(f"ローカルAI({LOCAL_EMBED_MODEL_NAME})でベクトル化中...")
     try:
-        response = requests.post(EMBED_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+        # 初回のみモデルダウンロード(約500MB)が発生します
+        model = SentenceTransformer(LOCAL_EMBED_MODEL_NAME)
+        embeddings = model.encode(texts)
+        return embeddings
     except Exception as e:
-        print(f"Embedding API Warning: {e}")
-        # エラー時は空リストを返してグラフ描画だけは止めない
+        print(f"Local Embedding Error: {e}")
         return [[] for _ in texts]
 
 def generate_next_steps(history_titles):
-    """
-    閲覧履歴(タイトル)をもとに、次に検索すべきキーワードをAIに考えさせる
-    """
-    if not history_titles:
-        return []
+    """閲覧履歴から次のキーワードをAI提案"""
+    if not history_titles: return []
 
-    # 直近3件くらいの履歴を使う
     context = ", ".join(history_titles[-3:])
     
-    # プロンプト（AIへの命令）
-    prompt = f"""<|system|>
-あなたは優秀な学習アシスタントです。ユーザーの関心を広げるための提案を行います。</s>
-<|user|>
+    # Qwen/Phi向けのプロンプト
+    prompt = f"""<|im_start|>system
+あなたはユーザーの関心を広げるアシスタントです。<|im_end|>
+<|im_start|>user
 ユーザーの閲覧履歴: "{context}"
-これに基づき、ユーザーが次に検索すべき「関連する発展的なキーワード」を3つ提案してください。
-
-条件:
-1. 日本語で出力すること。
-2. キーワードのみをカンマ区切りで出力すること。余計な説明は不要。
-3. 出力例: Python 非同期処理, イベントループ, 並行プログラミング</s>
-<|assistant|>"""
+これに基づき、次に検索すべき「関連するキーワード」を3つ提案してください。
+条件: 日本語, カンマ区切り, 説明不要。
+例: Python 非同期, イベントループ, 並列処理<|im_end|>
+<|im_start|>assistant
+"""
     
     headers = get_hf_headers()
+    if not headers: return ["トークン未設定"]
+
     payload = {
         "inputs": prompt,
         "parameters": {
@@ -87,22 +79,22 @@ def generate_next_steps(history_titles):
         }
     }
     
-    print("AIが未来の可能性を計算中...")
+    print("AI(Qwen2.5)が未来の可能性を計算中...")
     try:
         response = requests.post(GEN_API_URL, headers=headers, json=payload)
         response.raise_for_status()
         result = response.json()
         
-        # 結果の解析
+        # レスポンス解析
         generated_text = result[0]['generated_text'].strip()
         suggestions = [s.strip() for s in generated_text.replace('\n', ',').split(',') if s.strip()]
         return suggestions[:3]
     except Exception as e:
         print(f"Generation API Warning: {e}")
-        # エラー時はダミーを表示
-        return ["AI提案(通信エラー)"]
+        # APIが混んでたりモデルが無い場合のエラーハンドリング
+        return ["AI提案(API混雑)"]
 
-# --- 3. ログ読み込み ---
+# --- 4. ログ読み込み ---
 
 def get_latest_search_log():
     home = str(Path.home())
@@ -111,16 +103,15 @@ def get_latest_search_log():
     list_of_files = glob.glob(search_pattern)
     return max(list_of_files, key=os.path.getctime) if list_of_files else None
 
-# --- 4. グラフ生成 ---
+# --- 5. グラフ生成 ---
 
 def create_trajectory_graph(data):
     G = nx.DiGraph()
     sorted_data = sorted(data, key=lambda x: x['timestamp'])
     
-    # --- A. 履歴ノードの構築 ---
+    # 履歴をローカルAIでベクトル化
     titles = [item['title'] for item in sorted_data]
-    print(f"履歴をベクトル化中 ({len(titles)}件)...")
-    embeddings = get_embeddings(titles)
+    embeddings = get_embeddings_local(titles)
     
     prev_node = None
     last_node = None
@@ -131,7 +122,6 @@ def create_trajectory_graph(data):
         search_word = entry.get('searchWord')
         vector = embeddings[i] if i < len(embeddings) else None
         
-        # ノード追加
         G.add_node(current_url, label=label, full_title=entry['title'], 
                    type='history', vector=vector)
         
@@ -141,13 +131,13 @@ def create_trajectory_graph(data):
         prev_node = current_url
         last_node = current_url
 
-    # --- B. 未来ノード(AI提案)の追加 ---
+    # 未来ノード (APIで提案)
     if last_node:
         suggestions = generate_next_steps(titles)
         print(f"AI提案キーワード: {suggestions}")
         
-        # 提案ワードもベクトル化
-        suggestion_vecs = get_embeddings(suggestions)
+        # 提案ワードもローカルでベクトル化
+        suggestion_vecs = get_embeddings_local(suggestions)
         
         for i, word in enumerate(suggestions):
             sug_id = f"suggestion_{i}"
@@ -160,19 +150,18 @@ def create_trajectory_graph(data):
             
     return G
 
-# --- 5. レイアウト・描画 ---
+# --- 6. レイアウト・描画 ---
 
 def apply_semantic_layout(G):
     nodes_with_vec = [n for n in G.nodes if G.nodes[n].get('vector') is not None]
     
-    # ベクトルデータの検証
-    valid_nodes = []
     valid_vectors = []
+    valid_nodes = []
     for n in nodes_with_vec:
         v = G.nodes[n]['vector']
-        if isinstance(v, list) and len(v) > 0:
-            valid_nodes.append(n)
+        if isinstance(v, (list, np.ndarray)) and len(v) > 0:
             valid_vectors.append(v)
+            valid_nodes.append(n)
             
     if not valid_vectors:
         return nx.spring_layout(G, k=0.9, seed=42)
@@ -200,30 +189,31 @@ def draw_graph(G):
     plt.figure(figsize=(12, 8))
     pos = apply_semantic_layout(G)
     
+    # ノードタイプ別の描画
     history_nodes = [n for n, attr in G.nodes(data=True) if attr.get('type') == 'history']
     suggest_nodes = [n for n, attr in G.nodes(data=True) if attr.get('type') == 'suggestion']
     
-    # 描画
     nx.draw_networkx_nodes(G, pos, nodelist=history_nodes, node_color='skyblue', node_size=1500, alpha=0.9)
     nx.draw_networkx_nodes(G, pos, nodelist=suggest_nodes, node_color='gold', node_size=2000, alpha=1.0)
     
+    # エッジ描画
     solid_edges = [(u, v) for u, v, attr in G.edges(data=True) if attr.get('style') != 'dotted']
     dotted_edges = [(u, v) for u, v, attr in G.edges(data=True) if attr.get('style') == 'dotted']
     
     nx.draw_networkx_edges(G, pos, edgelist=solid_edges, edge_color='gray', width=2)
     nx.draw_networkx_edges(G, pos, edgelist=dotted_edges, edge_color='orange', style='dashed', width=3, arrowsize=25)
     
+    # ラベル描画
     node_labels = {n: G.nodes[n]['label'] for n in G.nodes}
     nx.draw_networkx_labels(G, pos, labels=node_labels, font_family='MS Gothic', font_size=9)
     
     edge_labels = { (u,v): "Next" for u,v in dotted_edges }
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_family='MS Gothic', font_size=8, font_color='orange')
     
-    plt.title("Knowledge Graph with AI Suggestions")
+    plt.title("Knowledge Graph with AI Suggestions (Qwen2.5)")
     plt.axis('off')
     plt.show()
 
-# --- 6. 実行 ---
 if __name__ == "__main__":
     try:
         json_file = get_latest_search_log()

@@ -12,10 +12,18 @@ import time
 plt.rcParams['font.family'] = 'MS Gothic' 
 
 # Hugging Face API設定
-# ※ ハッカソン本番では環境変数から読み込むのが安全です
-HF_TOKEN = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" # ここにトークンを入力
+# セキュアに扱うため、環境変数 `HF_TOKEN` から読み込みます。
+# ※ 実行環境に設定されていない場合はプレースホルダが使われます（その場合は注意喚起が出ます）。
+HF_TOKEN_PLACEHOLDER = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
+
+def get_hf_token():
+    """環境変数から HF_TOKEN を取得（未設定ならプレースホルダを返す）"""
+    return os.environ.get("HF_TOKEN", HF_TOKEN_PLACEHOLDER)
+
+def build_hf_headers():
+    token = get_hf_token()
+    return {"Authorization": f"Bearer {token}"}
 
 # --- 関数定義 ---
 
@@ -42,7 +50,8 @@ def get_embeddings(texts):
     
     try:
         # APIレート制限を考慮して少し待つなどの処理を入れても良い
-        response = requests.post(API_URL, headers=HEADERS, json=payload)
+        headers = build_hf_headers()
+        response = requests.post(API_URL, headers=headers, json=payload)
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -128,6 +137,10 @@ def draw_graph(G):
 
 # --- メイン実行 ---
 if __name__ == "__main__":
+    # 実行時に HF_TOKEN がプレースホルダのままかどうかを通知
+    if get_hf_token() == HF_TOKEN_PLACEHOLDER:
+        print("WARNING: HF_TOKEN が未設定です。環境変数 HF_TOKEN を設定してください。API 呼び出しは失敗する可能性があります。")
+
     json_file = get_latest_search_log()
     
     if json_file:

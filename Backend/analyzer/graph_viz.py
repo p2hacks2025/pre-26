@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 import networkx as nx
 import matplotlib.pyplot as plt
-import requests
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
@@ -13,34 +12,26 @@ from dotenv import load_dotenv
 # ローカルでベクトル化するためのライブラリ
 from sentence_transformers import SentenceTransformer
 
+# ★重要: Hugging Face公式クライアントを使用（URL問題を自動解決）
+from huggingface_hub import InferenceClient
+
 # --- 1. 環境設定 ---
 load_dotenv()
-
-# 日本語フォント設定
 plt.rcParams['font.family'] = 'MS Gothic'
 
 # --- 2. モデル設定 ---
 
-# 【Embedding】ローカル実行用モデル
-# 既にDL済みのMiniLMを使用します（確実で高速です）
+# 【Embedding】ローカル実行 (ダウンロード済み)
 LOCAL_EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-# 【Generation】API実行用モデル
-# ★ここを修正: ユーザー指摘の「新URL形式 (router)」に変更
-# これで Qwen/Qwen2.5-7B-Instruct に再接続を試みます
-GEN_API_URL = "https://router.huggingface.co/hf-inference/models/Qwen/Qwen2.5-7B-Instruct"
+# 【Generation】API実行 (Qwen2.5-7B)
+# 公式クライアントを使うのでURL指定は不要ですが、モデル名は指定します
+GEN_MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 
 # --- 3. 関数定義 ---
 
-def get_hf_headers():
-    token = os.getenv("HF_TOKEN")
-    if not token:
-        print("Warning: HF_TOKEN not found. 生成AI機能は使えません。")
-        return {}
-    return {"Authorization": f"Bearer {token}"}
-
 def get_embeddings_local(texts):
-    """ローカルのSentenceTransformerでベクトル化"""
+    """ローカルAIでベクトル化"""
     if not texts: return []
     
     print(f"ローカルAI({LOCAL_EMBED_MODEL_NAME})でベクトル化中...")
@@ -53,12 +44,12 @@ def get_embeddings_local(texts):
         return [[] for _ in texts]
 
 def generate_next_steps(history_titles):
-    """閲覧履歴から次のキーワードをAI提案 (Qwen2.5 - Router API)"""
+    """閲覧履歴から次のキーワードをAI提案 (InferenceClient使用)"""
     if not history_titles: return []
 
     context = ", ".join(history_titles[-3:])
     
-    # Qwen向けのプロンプト
+    # プロンプト
     prompt = f"""<|im_start|>system
 あなたはユーザーの関心を広げるアシスタントです。<|im_end|>
 <|im_start|>user
@@ -69,34 +60,48 @@ def generate_next_steps(history_titles):
 <|im_start|>assistant
 """
     
-    headers = get_hf_headers()
-    if not headers: return ["トークン未設定"]
+    token = os.getenv("HF_TOKEN")
+    if not token:
+        print("Error: .envに HF_TOKEN が設定されていません")
+        return ["トークン未設定"]
 
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 50,
-            "return_full_text": False,
-            "temperature": 0.7
-        }
-    }
+    print(f"AI({GEN_MODEL_ID})が未来の可能性を計算中...")
     
-    print("AI(Qwen2.5)が未来の可能性を計算中...")
     try:
-        response = requests.post(GEN_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        result = response.json()
+        # ★ここが変更点: 公式クライアントで接続
+        client = InferenceClient(token=token)
+        
+        response = client.chat.completions.create(
+            model=GEN_MODEL_ID,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=50,
+            temperature=0.7
+        )
         
         # レスポンス解析
-        generated_text = result[0]['generated_text'].strip()
+        generated_text = response.choices[0].message.content.strip()
         suggestions = [s.strip() for s in generated_text.replace('\n', ',').split(',') if s.strip()]
         return suggestions[:3]
+
     except Exception as e:
-        print(f"Generation API Warning: {e}")
-        # 詳細なエラーを表示してデバッグしやすくする
-        if hasattr(e, 'response') and e.response is not None:
-             print(f"API Response: {e.response.text}")
-        return ["AI提案(エラー)"]
+        print(f"Generation Error: {e}")
+        # Qwenが混雑している場合のフォールバック（自動でPhi-3.5を試す）
+        if "429" in str(e) or "410" in str(e) or "500" in str(e) or "503" in str(e):
+            print("Qwenが応答しないため、軽量モデル(Phi-3.5)で再試行します...")
+            try:
+                fallback_model = "microsoft/Phi-3.5-mini-instruct"
+                response = client.chat.completions.create(
+                    model=fallback_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=50
+                )
+                generated_text = response.choices[0].message.content.strip()
+                suggestions = [s.strip() for s in generated_text.replace('\n', ',').split(',') if s.strip()]
+                return suggestions[:3]
+            except Exception as e2:
+                print(f"Fallback Error: {e2}")
+
+        return ["AI提案(混雑中)"]
 
 # --- 4. ログ読み込み ---
 
@@ -173,7 +178,6 @@ def apply_semantic_layout(G):
     try:
         sim_matrix = cosine_similarity(valid_vectors)
     except Exception as e:
-        print(f"類似度計算スキップ: {e}")
         return nx.spring_layout(G, k=0.9, seed=42)
     
     layout_G = G.copy()
@@ -211,7 +215,7 @@ def draw_graph(G):
     edge_labels = { (u,v): "Next" for u,v in dotted_edges }
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_family='MS Gothic', font_size=8, font_color='orange')
     
-    plt.title("Knowledge Graph with AI Suggestions (Qwen2.5)")
+    plt.title("Knowledge Graph with AI Suggestions (InferenceClient)")
     plt.axis('off')
     plt.show()
 

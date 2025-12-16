@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 # ローカルでベクトル化するためのライブラリ
 from sentence_transformers import SentenceTransformer
 
-# Hugging Face公式クライアントを使用
+# ★重要: Hugging Face公式クライアントを使用（URL問題を自動解決）
 from huggingface_hub import InferenceClient
 
 # --- 1. 環境設定 ---
@@ -21,12 +21,12 @@ plt.rcParams['font.family'] = 'MS Gothic'
 
 # --- 2. モデル設定 ---
 
-# 【Embedding】ローカル実行
+# 【Embedding】ローカル実行 (ダウンロード済み)
 LOCAL_EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-# 【Generation】API実行 (Qwen3-7B)
+# 【Generation】API実行 (Qwen2.5-7B)
 # 公式クライアントを使うのでURL指定は不要ですが、モデル名は指定します
-GEN_MODEL_ID = "Qwen/Qwen3-7B-Instruct"
+GEN_MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 
 # --- 3. 関数定義 ---
 
@@ -68,6 +68,7 @@ def generate_next_steps(history_titles):
     print(f"AI({GEN_MODEL_ID})が未来の可能性を計算中...")
     
     try:
+        # ★ここが変更点: 公式クライアントで接続
         client = InferenceClient(token=token)
         
         response = client.chat.completions.create(

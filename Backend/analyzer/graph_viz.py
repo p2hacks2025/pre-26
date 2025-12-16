@@ -4,10 +4,20 @@ import glob
 from pathlib import Path
 import networkx as nx
 import matplotlib.pyplot as plt
+import requests
+import time
 
-# --- 日本語フォントの設定（Windows用） ---
-# グラフの文字化けを防ぐため、MS Gothicなどを指定します
-plt.rcParams['font.family'] = 'MS Gothic'
+# --- 設定 ---
+# 日本語フォント設定 (WindowsはMS Gothic, MacはHiragino Sansなど適宜変更)
+plt.rcParams['font.family'] = 'MS Gothic' 
+
+# Hugging Face API設定
+# ※ ハッカソン本番では環境変数から読み込むのが安全です
+HF_TOKEN = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" # ここにトークンを入力
+API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+HEADERS = {"Authorization": f"Bearer {HF_TOKEN}"}
+
+# --- 関数定義 ---
 
 def get_latest_search_log():
     """ダウンロードフォルダから最新のsearch_log_*.jsonを取得"""
@@ -20,63 +30,100 @@ def get_latest_search_log():
         return None
     return max(list_of_files, key=os.path.getctime)
 
-def create_browse_graph(data):
-    """ログデータからNetworkXのグラフを生成"""
-    G = nx.DiGraph() # 有向グラフ（矢印あり）
+def get_embeddings(texts):
+    """Hugging Face APIを使ってテキストをベクトル化"""
+    if not texts:
+        return []
     
-    # データを時系列順に確実にする
+    payload = {
+        "inputs": texts,
+        "options": {"wait_for_model": True}
+    }
+    
+    try:
+        # APIレート制限を考慮して少し待つなどの処理を入れても良い
+        response = requests.post(API_URL, headers=HEADERS, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Embedding Error: {e}")
+        # エラー時はダミー(空リスト等)を返して処理を止めない
+        return [[] for _ in texts]
+
+def create_trajectory_graph(data):
+    """
+    検索ワードをノードにせず、ページ遷移の軌跡としてグラフを作成
+    """
+    G = nx.DiGraph()
+    
+    # 時系列順にソート
     sorted_data = sorted(data, key=lambda x: x['timestamp'])
+    
+    # 1. ベクトル化の準備（今回はタイトルを使用）
+    # 全件一括でAPIに投げると重い場合があるので、実運用ではバッチ分割を推奨
+    titles = [item['title'] for item in sorted_data]
+    print(f"AI処理中: {len(titles)}件のテキストをベクトル化しています...")
+    embeddings = get_embeddings(titles)
     
     prev_node = None
     
     for i, entry in enumerate(sorted_data):
-        # ノードの識別子としてURLを使用（長いのでラベルはタイトルにする）
         current_url = entry['url']
-        title = entry['title'][:15] + "..." # 長すぎるので省略
+        # 表示用ラベル（長い場合はカット）
+        label = entry['title'][:15] + "..." if len(entry['title']) > 15 else entry['title']
         search_word = entry.get('searchWord')
         
-        # 1. 閲覧ページをノードとして追加
-        G.add_node(current_url, label=title, type='page', color='skyblue')
+        # ベクトルデータの取得（API失敗時はNone）
+        vector = embeddings[i] if i < len(embeddings) else None
         
-        # 2. 直前のページから現在のページへ遷移エッジを追加（軌跡）
+        # ノード追加（メタデータとしてベクトルやタイムスタンプを持たせる）
+        G.add_node(current_url, 
+                   label=label, 
+                   title=entry['title'],
+                   timestamp=entry['timestamp'],
+                   vector=vector)
+        
+        # エッジ追加（軌跡）
         if prev_node:
-            G.add_edge(prev_node, current_url, relation='next', color='black')
+            # 検索ワードがあればエッジのラベルにする
+            edge_label = search_word if search_word else ""
             
-        # 3. 検索ワードがある場合、検索ワードもノードにして繋ぐ
-        if search_word:
-            word_node = f"Search: {search_word}"
-            G.add_node(word_node, label=search_word, type='keyword', color='orange')
-            G.add_edge(word_node, current_url, relation='searched', color='red')
+            # エッジの色：検索経由なら赤、ただのリンク遷移なら黒、などの区別も可能
+            edge_color = 'red' if search_word else 'black'
+            
+            G.add_edge(prev_node, current_url, 
+                       label=edge_label, 
+                       color=edge_color)
             
         prev_node = current_url
         
     return G
 
 def draw_graph(G):
-    """グラフを描画"""
+    """描画処理"""
     plt.figure(figsize=(12, 8))
     
-    # ノードの配置決定（spring_layoutが一般的）
-    pos = nx.spring_layout(G, k=0.8) # kを大きくするとノード間が広がる
+    # レイアウト: spring_layout で「つながり」を可視化
+    # ※将来的にはここでベクトルの類似度(weight)を使った配置計算を行う
+    pos = nx.spring_layout(G, k=0.9, seed=42)
     
-    # ノードの色分け
-    colors = [G.nodes[n].get('color', 'grey') for n in G.nodes]
+    # ノード描画
+    nx.draw_networkx_nodes(G, pos, node_size=1500, node_color='skyblue', alpha=0.9)
     
-    # ラベルの用意
-    labels = {n: G.nodes[n].get('label', '') for n in G.nodes}
+    # ラベル描画
+    node_labels = {n: G.nodes[n]['label'] for n in G.nodes}
+    nx.draw_networkx_labels(G, pos, labels=node_labels, font_family='MS Gothic', font_size=9)
     
-    # 描画
-    nx.draw(G, pos, 
-            with_labels=True, 
-            labels=labels, 
-            node_color=colors, 
-            node_size=2000, 
-            font_size=10,
-            font_family='MS Gothic', # ここでもフォント指定
-            edge_color='gray',
-            arrowsize=20)
-            
-    plt.title("Browsing Trajectory & Search Words")
+    # エッジ描画
+    edge_colors = [G[u][v]['color'] for u, v in G.edges]
+    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, arrowsize=20, width=2)
+    
+    # エッジラベル（検索ワード）描画
+    edge_labels = { (u,v): G[u][v]['label'] for u,v in G.edges if G[u][v]['label'] }
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_family='MS Gothic', font_size=8)
+    
+    plt.title("User's Knowledge Trajectory (with AI Embeddings)")
+    plt.axis('off')
     plt.show()
 
 # --- メイン実行 ---
@@ -88,9 +135,11 @@ if __name__ == "__main__":
         with open(json_file, 'r', encoding='utf-8') as f:
             log_data = json.load(f)
             
-        # グラフ作成と描画
-        graph = create_browse_graph(log_data)
+        # グラフ作成
+        graph = create_trajectory_graph(log_data)
+        
         print(f"Nodes: {graph.number_of_nodes()}, Edges: {graph.number_of_edges()}")
+        print("描画します...")
         draw_graph(graph)
     else:
-        print("ログファイルが見つかりません。拡張機能からJSONを保存してください。")
+        print("ログファイルが見つかりません。")

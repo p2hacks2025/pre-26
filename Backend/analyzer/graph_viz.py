@@ -22,9 +22,12 @@ plt.rcParams['font.family'] = 'MS Gothic'
 # --- 2. モデル設定 ---
 
 # 【Embedding】ローカル実行用モデル
-# APIエラー(410 Gone)を避けるため、ローカルで動かします
+# 既にDL済みのMiniLMを使用します（確実で高速です）
 LOCAL_EMBED_MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
+# 【Generation】API実行用モデル
+# ★ここを修正: ユーザー指摘の「新URL形式 (router)」に変更
+# これで Qwen/Qwen2.5-7B-Instruct に再接続を試みます
 GEN_API_URL = "https://router.huggingface.co/hf-inference/models/Qwen/Qwen2.5-7B-Instruct"
 
 # --- 3. 関数定義 ---
@@ -42,7 +45,6 @@ def get_embeddings_local(texts):
     
     print(f"ローカルAI({LOCAL_EMBED_MODEL_NAME})でベクトル化中...")
     try:
-        # 初回のみモデルダウンロード(約500MB)が発生します
         model = SentenceTransformer(LOCAL_EMBED_MODEL_NAME)
         embeddings = model.encode(texts)
         return embeddings
@@ -51,12 +53,12 @@ def get_embeddings_local(texts):
         return [[] for _ in texts]
 
 def generate_next_steps(history_titles):
-    """閲覧履歴から次のキーワードをAI提案"""
+    """閲覧履歴から次のキーワードをAI提案 (Qwen2.5 - Router API)"""
     if not history_titles: return []
 
     context = ", ".join(history_titles[-3:])
     
-    # Qwen/Phi向けのプロンプト
+    # Qwen向けのプロンプト
     prompt = f"""<|im_start|>system
 あなたはユーザーの関心を広げるアシスタントです。<|im_end|>
 <|im_start|>user
@@ -91,8 +93,10 @@ def generate_next_steps(history_titles):
         return suggestions[:3]
     except Exception as e:
         print(f"Generation API Warning: {e}")
-        # APIが混んでたりモデルが無い場合のエラーハンドリング
-        return ["AI提案(API混雑)"]
+        # 詳細なエラーを表示してデバッグしやすくする
+        if hasattr(e, 'response') and e.response is not None:
+             print(f"API Response: {e.response.text}")
+        return ["AI提案(エラー)"]
 
 # --- 4. ログ読み込み ---
 
@@ -189,21 +193,18 @@ def draw_graph(G):
     plt.figure(figsize=(12, 8))
     pos = apply_semantic_layout(G)
     
-    # ノードタイプ別の描画
     history_nodes = [n for n, attr in G.nodes(data=True) if attr.get('type') == 'history']
     suggest_nodes = [n for n, attr in G.nodes(data=True) if attr.get('type') == 'suggestion']
     
     nx.draw_networkx_nodes(G, pos, nodelist=history_nodes, node_color='skyblue', node_size=1500, alpha=0.9)
     nx.draw_networkx_nodes(G, pos, nodelist=suggest_nodes, node_color='gold', node_size=2000, alpha=1.0)
     
-    # エッジ描画
     solid_edges = [(u, v) for u, v, attr in G.edges(data=True) if attr.get('style') != 'dotted']
     dotted_edges = [(u, v) for u, v, attr in G.edges(data=True) if attr.get('style') == 'dotted']
     
     nx.draw_networkx_edges(G, pos, edgelist=solid_edges, edge_color='gray', width=2)
     nx.draw_networkx_edges(G, pos, edgelist=dotted_edges, edge_color='orange', style='dashed', width=3, arrowsize=25)
     
-    # ラベル描画
     node_labels = {n: G.nodes[n]['label'] for n in G.nodes}
     nx.draw_networkx_labels(G, pos, labels=node_labels, font_family='MS Gothic', font_size=9)
     

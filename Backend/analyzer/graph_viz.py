@@ -1,5 +1,6 @@
 import json
 import os
+from dotenv import load_dotenv
 import glob
 from pathlib import Path
 import networkx as nx
@@ -11,18 +12,22 @@ import time
 # 日本語フォント設定 (WindowsはMS Gothic, MacはHiragino Sansなど適宜変更)
 plt.rcParams['font.family'] = 'MS Gothic' 
 
-# Hugging Face API設定
-# セキュアに扱うため、環境変数 `HF_TOKEN` から読み込みます。
-# ※ 実行環境に設定されていない場合はプレースホルダが使われます（その場合は注意喚起が出ます）。
-HF_TOKEN_PLACEHOLDER = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+load_dotenv()
+
 API_URL = "https://api-inference.huggingface.co/models/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-def get_hf_token():
-    """環境変数から HF_TOKEN を取得（未設定ならプレースホルダを返す）"""
-    return os.environ.get("HF_TOKEN", HF_TOKEN_PLACEHOLDER)
+def get_hf_headers():
+    """
+    Hugging Face API用のヘッダーを生成する。
+    トークンが未設定の場合はエラーを出して止める（デバッグしやすくするため）。
+    """
+    token = os.getenv("HF_TOKEN")
+    
+    # トークン取得チェック
+    if not token:
+        # トークンが無い場合はここで明確にエラーを投げる
+        raise ValueError("【エラー】環境変数 'HF_TOKEN' が読み込めませんでした。.envファイルを確認してください。")
 
-def build_hf_headers():
-    token = get_hf_token()
     return {"Authorization": f"Bearer {token}"}
 
 # --- 関数定義 ---

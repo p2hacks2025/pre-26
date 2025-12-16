@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Search & Browse Logger",
+  "version": "1.0",
+  "description": "閲覧履歴と検索ワードをローカルに記録します",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ログ出力"
+  }
+}

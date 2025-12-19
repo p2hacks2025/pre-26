@@ -2,17 +2,18 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Live Knowledge Graph</title>
+    <title>Live Knowledge Graph (Debug)</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        #graph_area { flex: 1; border: 1px solid #ddd; border-radius: 8px; position: relative; }
+        #graph_area { flex: 1; border: 1px solid #ddd; border-radius: 8px; position: relative; min-height: 400px; /* ★高さを確保 */ }
         button { padding: 8px 16px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 4px; font-size: 14px; }
         button:hover { background: #357ae8; }
         button.danger { background: #d93025; margin-left: 10px; }
         button.danger:hover { background: #b02a20; }
         #status { color: #666; font-size: 0.9em; margin-right: 10px; }
+        #debug_log { margin-top: 10px; padding: 10px; background: #f0f0f0; border: 1px solid #ccc; font-family: monospace; font-size: 12px; height: 100px; overflow-y: scroll; display: none; }
     </style>
 </head>
 <body>
@@ -22,43 +23,65 @@
             <span id="status">Ready</span>
             <button onclick="fetchGraph()">グラフ更新</button>
             <button class="danger" onclick="clearLogs()">ログ消去</button>
+            <button onclick="toggleDebug()" style="background:#777; margin-left:10px;">デバッグ表示</button>
         </div>
     </header>
     
     <div id="graph_area">Loading...</div>
+    <div id="debug_log"></div>
 
     <script>
         const API_URL = "http://127.0.0.1:8000";
+
+        function log(msg) {
+            console.log(msg);
+            const logDiv = document.getElementById('debug_log');
+            logDiv.innerHTML += `<div>${new Date().toLocaleTimeString()} ${msg}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function toggleDebug() {
+            const d = document.getElementById('debug_log');
+            d.style.display = d.style.display === 'none' ? 'block' : 'none';
+        }
 
         // グラフデータの取得と描画
         async function fetchGraph() {
             const statusEl = document.getElementById('status');
             statusEl.innerText = "Updating...";
+            log("Fetching graph data...");
             
             try {
-                const response = await fetch(`${API_URL}/api/graph`);
-                if (!response.ok) throw new Error("Server Error");
+                // キャッシュ回避のためにタイムスタンプを付与
+                const response = await fetch(`${API_URL}/api/graph?t=${new Date().getTime()}`);
+                
+                if (!response.ok) throw new Error(`Server returned ${response.status}`);
                 
                 const fig = await response.json();
+                log(`Received Data: ${JSON.stringify(fig).substring(0, 100)}...`); // データの先頭を表示
                 
-                if (!fig.data || fig.data.length === 0) {
-                    document.getElementById('graph_area').innerText = "データがありません。ブラウジングを開始してください。";
+                // データチェック
+                if (!fig || !fig.data || fig.data.length === 0) {
+                    log("Data is empty.");
+                    document.getElementById('graph_area').innerText = "データがありません。サーバーにログが届いていない可能性があります。";
                     statusEl.innerText = "No Data";
                     return;
                 }
 
-                // 前回のグラフをクリアして再描画
-                document.getElementById('graph_area').innerText = ""; 
-                Plotly.newPlot('graph_area', fig.data, fig.layout);
+                log(`Traces found: ${fig.data.length} items`);
 
-                // クリックイベントの設定 (始点からのパス表示)
+                // 描画
+                document.getElementById('graph_area').innerText = ""; 
+                await Plotly.newPlot('graph_area', fig.data, fig.layout);
+                log("Graph plotted successfully.");
+
+                // クリックイベント
                 const myPlot = document.getElementById('graph_area');
+                myPlot.removeAllListeners('plotly_click'); // 重複防止
                 myPlot.on('plotly_click', function(data){
                     if (data.points.length > 0) {
                         const pathText = data.points[0].customdata;
-                        if (pathText) {
-                            alert("【始点からの道のり】\n\n" + pathText);
-                        }
+                        if (pathText) alert("【始点からの道のり】\n\n" + pathText);
                     }
                 });
                 
@@ -66,20 +89,16 @@
 
             } catch (e) {
                 console.error(e);
-                document.getElementById('graph_area').innerText = "サーバー接続エラー: " + e.message + "\n(Backendが起動しているか確認してください)";
+                log(`Error: ${e.message}`);
+                document.getElementById('graph_area').innerText = "エラー:\n" + e.message;
                 statusEl.innerText = "Error";
             }
         }
 
-        // ログの消去
         async function clearLogs() {
-            if(confirm("サーバー上のログを全て消去しますか？")) {
-                try {
-                    await fetch(`${API_URL}/api/logs`, { method: 'DELETE' });
-                    fetchGraph(); // グラフもクリア
-                } catch (e) {
-                    alert("削除に失敗しました: " + e.message);
-                }
+            if(confirm("ログを消去しますか？")) {
+                await fetch(`${API_URL}/api/logs`, { method: 'DELETE' });
+                fetchGraph();
             }
         }
 

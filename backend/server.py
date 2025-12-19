@@ -1,13 +1,14 @@
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import uvicorn
-import logic  # logic.py をインポート
+import logic
 
 app = FastAPI()
 
-# CORS設定 (開発用: すべてのオリジンを許可)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,8 +17,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 簡易データベース (メモリ内リスト)
-# サーバー再起動で消えるため、永続化が必要ならファイルやDBへ保存する処理を追加してください
 search_logs = []
 
 class LogItem(BaseModel):
@@ -29,36 +28,40 @@ class LogItem(BaseModel):
 
 @app.post("/api/log")
 async def receive_log(item: LogItem):
-    """拡張機能からログを受け取る"""
     print(f"Received Log: {item.title}")
     search_logs.append(item.dict())
     return {"status": "ok", "count": len(search_logs)}
 
 @app.get("/api/graph")
 async def get_graph():
-    """グラフデータを生成して返す"""
+    print(f"DEBUG: Generating graph for {len(search_logs)} items...")
+    
     if not search_logs:
         return {"data": [], "layout": {}}
     
     try:
         fig_data = logic.create_graph_data(search_logs)
+        
+        # デバッグ: 結果がNoneになっていないか確認
+        if fig_data is None:
+            print("DEBUG: logic.create_graph_data returned None!")
+            # フロントエンドにnullではなく空のグラフ設定を返してエラーを防ぐ
+            return {"data": [], "layout": {}}
+            
         return fig_data
     except Exception as e:
         print(f"Error generating graph: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/logs")
-async def get_logs():
-    """保存されているログ一覧を取得 (デバッグ用)"""
-    return search_logs
-
 @app.delete("/api/logs")
 async def clear_logs():
-    """ログを全消去"""
     global search_logs
     search_logs = []
     print("All logs cleared.")
     return {"status": "cleared"}
+
+if os.path.exists("frontend"):
+    app.mount("/", StaticFiles(directory="frontend", html=True), name="static")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

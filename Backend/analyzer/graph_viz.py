@@ -92,8 +92,6 @@ def create_trajectory_graph(data):
     
     prev_node = None
     last_node = None
-    
-    # 始点ノードを特定するためにリストの先頭を記録
     start_node_id = sorted_data[0]['url'] if sorted_data else None
 
     for i, entry in enumerate(sorted_data):
@@ -112,7 +110,6 @@ def create_trajectory_graph(data):
         prev_node = current_url
         last_node = current_url
 
-    # 未来ノード
     if last_node:
         suggestions = generate_next_steps(titles)
         suggestion_vecs = get_embeddings_local(suggestions)
@@ -126,14 +123,12 @@ def create_trajectory_graph(data):
             
             G.add_edge(last_node, sug_id, label="Next?", style='dotted')
 
-    # グラフオブジェクトに始点情報を付与しておく
     G.graph['start_node'] = start_node_id
     return G
 
 # --- 6. パス計算とレイアウト ---
 
 def calculate_paths(G):
-    """始点から各ノードまでのパスを計算し、フォーマット済み文字列の辞書を返す"""
     start_node = G.graph.get('start_node')
     path_texts = {}
     
@@ -142,17 +137,13 @@ def calculate_paths(G):
 
     for node in G.nodes():
         try:
-            # 始点から現在のノードまでの最短パス（ノードIDのリスト）を取得
             path = nx.shortest_path(G, source=start_node, target=node)
-            
-            # パスを読みやすいテキストに変換
             steps = []
             for idx, p_node in enumerate(path):
                 title = G.nodes[p_node].get('label', 'Unknown')
                 steps.append(f"{idx + 1}. {title}")
             
-            # ポップアップ表示用のテキスト
-            path_texts[node] = "\\n".join(steps) # JSのalert用に改行文字をエスケープ
+            path_texts[node] = "\\n".join(steps)
             
         except nx.NetworkXNoPath:
             path_texts[node] = "始点からの経路が見つかりません"
@@ -195,11 +186,8 @@ def apply_semantic_layout(G):
 
 def draw_graph(G):
     pos = apply_semantic_layout(G)
-    
-    # パス情報の事前計算
     path_info_map = calculate_paths(G)
     
-    # --- エッジの作成 ---
     edge_x_solid, edge_y_solid = [], []
     edge_x_dotted, edge_y_dotted = [], []
     edge_annotations = []
@@ -245,16 +233,13 @@ def draw_graph(G):
         mode='lines'
     )
 
-    # --- ノードの作成 ---
-    # 履歴ノード
     node_x_hist, node_y_hist = [], []
     node_text_hist = []
-    node_custom_hist = [] # パス情報を格納
+    node_custom_hist = []
     
-    # 提案ノード
     node_x_sug, node_y_sug = [], []
     node_text_sug = []
-    node_custom_sug = [] # パス情報を格納
+    node_custom_sug = []
 
     for node in G.nodes():
         x, y = pos[node]
@@ -263,7 +248,7 @@ def draw_graph(G):
         label = attr.get('label', node)
         
         hover_info = f"<b>{label}</b><br>{full_title}"
-        path_info = path_info_map.get(node, "経路情報なし") # 計算したパスを取得
+        path_info = path_info_map.get(node, "経路情報なし")
 
         if attr.get('type') == 'suggestion':
             node_x_sug.append(x)
@@ -282,7 +267,7 @@ def draw_graph(G):
         textposition="top center",
         hoverinfo='text',
         hovertext=node_text_hist,
-        customdata=node_custom_hist, # ★ここにパス情報を埋め込む
+        customdata=node_custom_hist,
         marker=dict(size=20, color='skyblue', line_width=2)
     )
 
@@ -292,11 +277,10 @@ def draw_graph(G):
         textposition="top center",
         hoverinfo='text',
         hovertext=node_text_sug,
-        customdata=node_custom_sug, # ★ここにパス情報を埋め込む
+        customdata=node_custom_sug,
         marker=dict(size=25, color='gold', line_width=2)
     )
 
-    # --- グラフ構成 ---
     fig = go.Figure(
         data=[edge_trace_solid, edge_trace_dotted, node_trace_hist, node_trace_sug],
         layout=go.Layout(
@@ -310,19 +294,18 @@ def draw_graph(G):
         )
     )
 
-    # --- HTMLとして保存し、JSイベントを注入 ---
-    # グラフのDIV IDを取得（HTML埋め込み時に必要）
+    # --- HTML生成（修正版） ---
     plot_div_id = "my_graph_div"
     
-    # PlotlyのHTML生成（divタグのみ）
-    plot_html = pio.to_html(fig, full_html=False, include_plotlyjs='cdn', div_id=plot_div_id)
+    # include_plotlyjs=False にして手動で制御する
+    plot_html = pio.to_html(fig, full_html=False, include_plotlyjs=False, div_id=plot_div_id)
 
-    # カスタムHTMLテンプレート
     html_content = f"""
     <html>
     <head>
         <title>Knowledge Graph</title>
         <meta charset="utf-8">
+        <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
         <style>
             body {{ font-family: sans-serif; margin: 0; padding: 20px; }}
             #info {{ margin-bottom: 10px; color: #555; }}
@@ -330,37 +313,45 @@ def draw_graph(G):
     </head>
     <body>
         <div id="info">ノードをクリックすると、始点からの道のりが表示されます。</div>
+        
         {plot_html}
         
         <script>
-            // グラフ要素を取得
+            // グラフ要素の取得
             var myPlot = document.getElementById('{plot_div_id}');
             
-            // クリックイベントのリスナーを追加
-            myPlot.on('plotly_click', function(data){{
-                var pts = '';
-                // クリックされたポイントのcustomdata（パス情報）を取得
-                if (data.points.length > 0) {{
-                    var pathText = data.points[0].customdata;
-                    if (pathText) {{
-                        // alertでポップアップ表示（改行文字\nはPython側で処理済み）
-                        alert("【始点からの道のり】\\n\\n" + pathText);
+            // 安全策: グラフ描画完了を確認してからイベントリスナーを追加
+            // Plotlyのグラフには 'plotly_afterplot' というイベントがあります
+            if (myPlot) {{
+                myPlot.on('plotly_afterplot', function(){{
+                     console.log("Graph plotted. Attaching click event.");
+                }});
+
+                myPlot.on('plotly_click', function(data){{
+                    console.log("Clicked!", data); // デバッグ用ログ
+                    
+                    if (data.points.length > 0) {{
+                        var pathText = data.points[0].customdata;
+                        if (pathText) {{
+                            alert("【始点からの道のり】\\n\\n" + pathText);
+                        }} else {{
+                            console.log("No customdata found for this node.");
+                        }}
                     }}
-                }}
-            }});
+                }});
+            }} else {{
+                console.error("Plot div not found!");
+            }}
         </script>
     </body>
     </html>
     """
 
-    # ファイルに書き出し
     output_file = "graph_with_path.html"
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(html_content)
 
     print(f"グラフを保存しました: {output_file}")
-    
-    # ブラウザで開く
     webbrowser.open('file://' + os.path.realpath(output_file))
 
 if __name__ == "__main__":

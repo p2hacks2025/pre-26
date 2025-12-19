@@ -1,0 +1,157 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-image: url('../assets/bg_night_sky.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #fff;
+}
+
+#controls {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+#controls h1 {
+  font-size: 1.5rem;
+  margin-right: auto;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-group label {
+  font-size: 0.9rem;
+}
+
+#range-select {
+  padding: 8px 12px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+}
+
+#range-select option {
+  background: #333;
+}
+
+#sync-btn {
+  padding: 8px 20px;
+  border-radius: 5px;
+  border: none;
+  background: #4a90d9;
+  color: #fff;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+#sync-btn:hover {
+  background: #357abd;
+}
+
+#sync-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+}
+
+#status {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+#graph-container {
+  position: fixed;
+  top: 70px;
+  left: 0;
+  right: 300px;
+  bottom: 0;
+}
+
+#graph {
+  width: 100%;
+  height: 100%;
+}
+
+#sidebar {
+  position: fixed;
+  top: 70px;
+  right: 0;
+  width: 300px;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 20px;
+  overflow-y: auto;
+  backdrop-filter: blur(10px);
+}
+
+#sidebar h2 {
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#recommend-section, #next-section {
+  margin-bottom: 30px;
+}
+
+#recommend-list, #next-list {
+  list-style: none;
+}
+
+#recommend-list li, #next-list li {
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#recommend-list li:hover, #next-list li:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.query-text {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.query-reason, .next-reason {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.next-label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Plotlyグラフの背景を透明に */
+.js-plotly-plot .plotly .bg {
+  fill: transparent !important;
+}

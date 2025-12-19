@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Live Knowledge Graph</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        #graph_area { flex: 1; border: 1px solid #ddd; border-radius: 8px; position: relative; }
+        button { padding: 8px 16px; cursor: pointer; background: #4285f4; color: white; border: none; border-radius: 4px; font-size: 14px; }
+        button:hover { background: #357ae8; }
+        button.danger { background: #d93025; margin-left: 10px; }
+        button.danger:hover { background: #b02a20; }
+        #status { color: #666; font-size: 0.9em; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>Live Browsing Graph</h2>
+        <div>
+            <span id="status">Ready</span>
+            <button onclick="fetchGraph()">グラフ更新</button>
+            <button class="danger" onclick="clearLogs()">ログ消去</button>
+        </div>
+    </header>
+    
+    <div id="graph_area">Loading...</div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+
+        // グラフデータの取得と描画
+        async function fetchGraph() {
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = "Updating...";
+            
+            try {
+                const response = await fetch(`${API_URL}/api/graph`);
+                if (!response.ok) throw new Error("Server Error");
+                
+                const fig = await response.json();
+                
+                if (!fig.data || fig.data.length === 0) {
+                    document.getElementById('graph_area').innerText = "データがありません。ブラウジングを開始してください。";
+                    statusEl.innerText = "No Data";
+                    return;
+                }
+
+                // 前回のグラフをクリアして再描画
+                document.getElementById('graph_area').innerText = ""; 
+                Plotly.newPlot('graph_area', fig.data, fig.layout);
+
+                // クリックイベントの設定 (始点からのパス表示)
+                const myPlot = document.getElementById('graph_area');
+                myPlot.on('plotly_click', function(data){
+                    if (data.points.length > 0) {
+                        const pathText = data.points[0].customdata;
+                        if (pathText) {
+                            alert("【始点からの道のり】\n\n" + pathText);
+                        }
+                    }
+                });
+                
+                statusEl.innerText = "Updated";
+
+            } catch (e) {
+                console.error(e);
+                document.getElementById('graph_area').innerText = "サーバー接続エラー: " + e.message + "\n(Backendが起動しているか確認してください)";
+                statusEl.innerText = "Error";
+            }
+        }
+
+        // ログの消去
+        async function clearLogs() {
+            if(confirm("サーバー上のログを全て消去しますか？")) {
+                try {
+                    await fetch(`${API_URL}/api/logs`, { method: 'DELETE' });
+                    fetchGraph(); // グラフもクリア
+                } catch (e) {
+                    alert("削除に失敗しました: " + e.message);
+                }
+            }
+        }
+
+        // 初回実行
+        fetchGraph();
+    </script>
+</body>
+</html>

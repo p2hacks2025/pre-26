@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Live Graph Logger",
+  "version": "2.0",
+  "description": "閲覧履歴をAPIサーバーへ送信します",
+  "permissions": [
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

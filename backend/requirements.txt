@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+networkx
+numpy
+scikit-learn
+python-dotenv
+sentence-transformers
+huggingface_hub
+plotly

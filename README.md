@@ -2,6 +2,7 @@
 
 ## プロダクト名
 SparkNavi
+SparkNavi
 
 ## コンセプト
 
@@ -9,6 +10,7 @@ SparkNavi
 ## 対象ユーザ
 
 ## 利用の流れ
+Chromeブラウザに拡張機能をインストール。
 Chromeブラウザに拡張機能をインストール。
 
 ## 推しポイント
@@ -28,6 +30,8 @@ issy：テックリーダー・プログラマ
 ### 開発における工夫した点
 - Plotlyを利用し、検索履歴をネットワークグラフとして表示したこと
 - 
+- Plotlyを利用し、検索履歴をネットワークグラフとして表示したこと
+- 
 
 ## 開発技術
 
@@ -36,8 +40,25 @@ issy：テックリーダー・プログラマ
 - Python
 - HTML
 - CSS
+- JavaScript
+- Python
+- HTML
+- CSS
 
 ### 利用したフレームワーク・ライブラリ
+- Plotly.js
+- Plotly
+- NetworkX
+- FastAPI
+- Pydantic
+- Typing
+- Math
+- Logging
+- Gemini API
+- datetime
+- uuid
+- urllib
+- json
 - Plotly.js
 - Plotly
 - NetworkX

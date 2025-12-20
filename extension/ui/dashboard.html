@@ -31,13 +31,23 @@
       <h2>おすすめ検索ワード</h2>
       <ul id="recommend-list"></ul>
     </div>
-    <div id="next-section">
-      <h2>次に進むべき場所</h2>
-      <ul id="next-list"></ul>
+    <div id="suggest-section">
+      <h2>次の検索場所を提案</h2>
+      <div class="suggest-controls">
+        <p>グラフ上のノードを2つクリックして選択してください</p>
+        <div id="selected-nodes">
+          <span id="selected-node-1" class="selected-node-label">未選択</span>
+          <span class="arrow">→</span>
+          <span id="selected-node-2" class="selected-node-label">未選択</span>
+        </div>
+        <button id="reset-selection-btn">選択をリセット</button>
+      </div>
+      <div id="suggest-status"></div>
+      <ul id="suggest-list"></ul>
     </div>
   </div>
 
   <script src="../vendor/plotly.min.js"></script>
-  <script src="dashboard.js"></script>
+  <script type="module" src="dashboard.js"></script>
 </body>
 </html>

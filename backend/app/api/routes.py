@@ -1,5 +1,12 @@
-from fastapi import APIRouter
-from app.schemas import AnalyzeRequest, AnalyzeResponse, Node, Edge, PathItem, NextNode, RecommendQuery
+from fastapi import APIRouter, HTTPException
+from app.schemas import (
+    AnalyzeRequest, AnalyzeResponse, Node, Edge, PathItem, NextNode, RecommendQuery,
+    SuggestRequest, SuggestResponse, SuggestedNode, SuggestedEdge
+)
+from app.services.graph_store import graph_store
+from app.services.gemini_service import generate_search_keywords
+from app.services.recommendation_service import generate_next_nodes
+import math
 
 router = APIRouter()
 
@@ -8,10 +15,12 @@ router = APIRouter()
 async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
     """
     履歴データを解析してネットワークグラフ用データを返す
-    P0: モックデータを返す骨格実装
     """
-    # P0: 受け取った履歴から簡易的なノードを生成
-    nodes = []
+    import networkx as nx
+    from urllib.parse import urlparse
+
+    # 受け取った履歴からノードとエッジを生成
+    nodes_dict = {}  # {node_id: Node}
     edges = []
     path = []
 
@@ -20,7 +29,6 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
 
     for i, item in enumerate(request.history[:request.maxNodes]):
         # URLからドメインを抽出
-        from urllib.parse import urlparse
         parsed = urlparse(item.url)
         domain = parsed.netloc or "unknown"
 
@@ -28,19 +36,16 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
             node_id = f"node_{len(seen_domains)}"
             seen_domains[domain] = node_id
 
-            # 簡易的な座標計算（P1で改善予定）
-            x = (len(seen_domains) % 10) * 100.0
-            y = (len(seen_domains) // 10) * 100.0
-
-            nodes.append(Node(
+            # 仮の座標（後でレイアウト計算で上書き）
+            nodes_dict[node_id] = Node(
                 id=node_id,
                 url=f"https://{domain}",
                 label=domain,
-                x=x,
-                y=y,
+                x=0.0,
+                y=0.0,
                 size=item.visitCount * 5,
                 hover_hints=[item.title[:30] if item.title else domain]
-            ))
+            )
 
         node_id = seen_domains[domain]
 
@@ -66,26 +71,149 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
 
         prev_node_id = node_id
 
-    # P0: ダミーのnext_nodesとrecommend_queries
-    next_nodes = [
-        NextNode(
-            id="next_1",
-            label="おすすめサイト",
-            url="https://example.com",
-            x=500.0,
-            y=500.0,
-            reason="よく訪問するサイトと関連"
-        )
-    ]
+    # NetworkXでグラフを構築してレイアウト計算
+    G = nx.Graph()
+    for node_id in nodes_dict:
+        G.add_node(node_id)
+    for edge in edges:
+        G.add_edge(edge.source, edge.target, weight=edge.weight)
 
+    # Spring layoutで座標計算（自然なネットワーク配置）
+    if len(G.nodes()) > 0:
+        pos = nx.spring_layout(G, k=2, iterations=50, scale=500, seed=42)
+
+        # 計算された座標をノードに適用
+        for node_id, (x, y) in pos.items():
+            nodes_dict[node_id].x = float(x)
+            nodes_dict[node_id].y = float(y)
+
+    # Nodeのリストに変換
+    nodes = list(nodes_dict.values())
+
+    # パターン分析と候補ノード生成
+    try:
+        next_nodes = generate_next_nodes(
+            history=request.history,
+            nodes_dict=nodes_dict,
+            path=path,
+            current_time=request.currentTime,
+            max_candidates=1
+        )
+    except Exception as e:
+        print(f"Error generating next nodes: {e}")
+        # エラー時は空リストを返す（全体の処理は継続）
+        next_nodes = []
+
+    # ダミーのrecommend_queries
     recommend_queries = [
         RecommendQuery(query="検索ワード例", reason="頻繁に訪問するサイトに関連")
     ]
+
+    # UUID生成とグラフデータ保存
+    session_uuid = graph_store.generate_uuid()
+    graph_data = {
+        "nodes": [node.model_dump() for node in nodes],
+        "edges": [edge.model_dump() for edge in edges],
+        "path": [p.model_dump() for p in path],
+    }
+    graph_store.save(session_uuid, graph_data)
 
     return AnalyzeResponse(
         nodes=nodes,
         edges=edges,
         path=path,
         next_nodes=next_nodes,
-        recommend_queries=recommend_queries
+        recommend_queries=recommend_queries,
+        uuid=session_uuid
+    )
+
+
+@router.post("/suggest", response_model=SuggestResponse)
+async def suggest_next_nodes(request: SuggestRequest) -> SuggestResponse:
+    """
+    次に検索すべき場所を提案する
+
+    2つのノード間の距離を計算し、Gemini APIで検索キーワードを生成して
+    新しいノードを提案する。
+    """
+    # UUIDでグラフデータを取得
+    graph_data = graph_store.get(request.uuid)
+    if not graph_data:
+        raise HTTPException(status_code=404, detail="Session not found. UUID may have expired.")
+
+    nodes = graph_data["nodes"]
+    edges = graph_data["edges"]
+
+    # 指定された2つのノードを検索
+    node1 = next((n for n in nodes if n["id"] == request.node_id_1), None)
+    node2 = next((n for n in nodes if n["id"] == request.node_id_2), None)
+
+    if not node1 or not node2:
+        raise HTTPException(status_code=400, detail="Specified node IDs not found in graph")
+
+    # NetworkXでグラフを再構築
+    import networkx as nx
+    G = nx.Graph()
+    for node in nodes:
+        G.add_node(node["id"], **node)
+    for edge in edges:
+        G.add_edge(edge["source"], edge["target"], weight=edge["weight"])
+
+    # 2ノード間の最短パスを計算
+    try:
+        shortest_path = nx.shortest_path(G, node1["id"], node2["id"])
+        path_length = len(shortest_path) - 1
+    except nx.NetworkXNoPath:
+        raise HTTPException(status_code=400, detail="No path found between the two nodes")
+
+    # パス上のノード情報を取得（Geminiへのプロンプト用）
+    path_nodes_info = [next(n for n in nodes if n["id"] == node_id) for node_id in shortest_path]
+
+    # Gemini APIで検索キーワードを生成
+    search_queries = generate_search_keywords(path_nodes_info)
+
+    # パスの中間地点のノードを取得（提案ノードの配置基準）
+    mid_point_index = len(path_nodes_info) // 2
+    mid_node = path_nodes_info[mid_point_index]
+
+    # 提案ノードを生成
+    suggested_nodes = []
+    suggested_edges = []
+
+    for i, keyword in enumerate(search_queries):
+        node_id = f"suggested_{i}"
+
+        # 中間ノードの周囲に円形配置（120度ずつ）
+        angle = (i * 120) * (math.pi / 180)
+        offset_distance = 100  # 中間ノードからの距離
+        x = mid_node["x"] + offset_distance * math.cos(angle)
+        y = mid_node["y"] + offset_distance * math.sin(angle)
+
+        suggested_nodes.append(SuggestedNode(
+            id=node_id,
+            label=keyword,
+            url=f"https://www.google.com/search?q={keyword}",
+            x=x,
+            y=y,
+            size=25,
+            hover_hints=[
+                f"検索キーワード: {keyword}",
+                f"パス長: {path_length}",
+                f"経路: {' → '.join([n['label'] for n in path_nodes_info[:3]])}"
+            ],
+            reason=f"閲覧経路「{' → '.join([n['label'] for n in path_nodes_info])}」から推測"
+        ))
+
+        # 中間ノードと接続
+        suggested_edges.append(SuggestedEdge(
+            source=mid_node["id"],
+            target=node_id,
+            weight=1
+        ))
+
+    return SuggestResponse(
+        suggested_nodes=suggested_nodes,
+        suggested_edges=suggested_edges,
+        search_queries=search_queries,
+        path_nodes=[n["id"] for n in path_nodes_info]
     )

@@ -1,7 +1,7 @@
 import { fetchHistory } from "./historyProvider.js";
 import { requestAnalysis, requestSuggestions } from "./apiClient.js";
-import { renderGraph, updateNodeHighlight, addSuggestedNodesToGraph } from "./graphRenderer.js";
-import { renderRecommendations, renderSuggestResults } from "./sidebar.js";
+import { renderGraph, updateNodeHighlight } from "./graphRenderer.js";
+import { renderRecommendations } from "./sidebar.js";
 import {
   getCurrentData,
   setCurrentData,
@@ -10,9 +10,7 @@ import {
   getSelectedNodes,
   setSelectedNodes,
   resetSelections,
-  getSuggestedNodesData,
-  resetSuggestedNodesData,
-  appendSuggestedNodes
+  resetSuggestedNodesData
 } from "./state.js";
 
 const syncBtn = document.getElementById("sync-btn");
@@ -20,11 +18,11 @@ const rangeSelect = document.getElementById("range-select");
 const statusEl = document.getElementById("status");
 const graphEl = document.getElementById("graph");
 const recommendList = document.getElementById("recommend-list");
+const previousRecommendList = document.getElementById("previous-recommend-list");
+const previousRecommendSection = document.getElementById("previous-recommend-section");
 const resetSelectionBtn = document.getElementById("reset-selection-btn");
 const selectedNode1Label = document.getElementById("selected-node-1");
 const selectedNode2Label = document.getElementById("selected-node-2");
-const suggestStatus = document.getElementById("suggest-status");
-const suggestList = document.getElementById("suggest-list");
 
 document.addEventListener("DOMContentLoaded", () => {
   syncBtn.addEventListener("click", handleSync);
@@ -91,17 +89,6 @@ async function loadMockData() {
 function handleNodeClick(event) {
   const clickedPoint = event.points[0];
   const nodeIndex = clickedPoint.pointIndex;
-  const selectedSuggestedNodes = getSuggestedNodesData();
-
-  const trace = clickedPoint.data;
-  if (trace.marker && trace.marker.symbol === "diamond" && trace.marker.color === "#00ff00") {
-    const clickedSuggestedNode = selectedSuggestedNodes[nodeIndex];
-    if (clickedSuggestedNode) {
-      const searchQuery = clickedSuggestedNode.label;
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, "_blank");
-      return;
-    }
-  }
 
   if (clickedPoint.curveNumber !== 2) {
     return;
@@ -162,25 +149,25 @@ function resetNodeSelection() {
   if (dataSet) {
     updateNodeHighlight(dataSet.nodes, getSelectedNodes());
   }
-  // 提案結果のみクリア（おすすめ検索ワードは残す）
-  suggestStatus.textContent = "";
-  suggestList.innerHTML = "";
+  // 以前のおすすめセクションをクリアして非表示に
+  previousRecommendList.innerHTML = "";
+  previousRecommendSection.style.display = "none";
 }
 
 async function handleSuggest() {
   const selectedNodes = getSelectedNodes();
   if (selectedNodes.length !== 2) {
-    suggestStatus.textContent = "エラー: 2つのノードを選択してください";
+    statusEl.textContent = "エラー: 2つのノードを選択してください";
     return;
   }
 
   const sessionUuid = getSessionUuid();
   if (!sessionUuid) {
-    suggestStatus.textContent = "エラー: セッションUUIDがありません。先に「同期」を実行してください";
+    statusEl.textContent = "エラー: セッションUUIDがありません。先に「同期」を実行してください";
     return;
   }
 
-  suggestStatus.textContent = "提案を取得中...";
+  statusEl.textContent = "提案を取得中...";
 
   try {
     const suggestData = await requestSuggestions(
@@ -189,20 +176,37 @@ async function handleSuggest() {
       selectedNodes[1].id
     );
 
-    const currentData = getCurrentData();
-    if (currentData) {
-      addSuggestedNodesToGraph(
-        currentData.nodes,
-        suggestData.suggested_nodes,
-        suggestData.suggested_edges
-      );
-      appendSuggestedNodes(suggestData.suggested_nodes);
+    // 既存のおすすめを「以前のおすすめ」に追加（上書きではなく追加）
+    if (recommendList.children.length > 0) {
+      // タイムスタンプセパレーターを追加
+      const separator = document.createElement("div");
+      separator.className = "recommendation-separator";
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      separator.textContent = `${timeString} の推薦`;
+
+      // 既存の内容の前に挿入（新しいものが上に来るように）
+      previousRecommendList.insertBefore(separator, previousRecommendList.firstChild);
+
+      // 現在のおすすめを1つずつ追加
+      Array.from(recommendList.children).reverse().forEach(child => {
+        const clonedChild = child.cloneNode(true);
+        previousRecommendList.insertBefore(clonedChild, previousRecommendList.firstChild);
+      });
+
+      previousRecommendSection.style.display = "block";
     }
 
-    renderSuggestResults(suggestList, suggestData);
-    suggestStatus.textContent = `提案完了: ${suggestData.suggested_nodes.length}ノード追加`;
+    // 提案キーワードを「おすすめ検索ワード」形式に変換
+    const suggestedQueries = suggestData.search_queries.map(query => ({
+      query: query,
+      reason: "🤖 AI提案"
+    }));
+
+    renderRecommendations(recommendList, suggestedQueries);
+    statusEl.textContent = `AI提案: ${suggestData.search_queries.length}個の検索キーワード`;
   } catch (error) {
     console.error("Suggest error:", error);
-    suggestStatus.textContent = `エラー: ${error.message}`;
+    statusEl.textContent = `エラー: ${error.message}`;
   }
 }

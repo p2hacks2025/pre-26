@@ -39,6 +39,10 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
             node_id = f"node_{len(seen_domains)}"
             seen_domains[domain] = node_id
 
+            max_size = 100
+            calculated_size = item.visitCount * 30
+            node_size = min(calculated_size, max_size)
+
             # 仮の座標（後でレイアウト計算で上書き）
             nodes_dict[node_id] = Node(
                 id=node_id,
@@ -46,7 +50,7 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
                 label=domain,
                 x=0.0,
                 y=0.0,
-                size=item.visitCount * 5,
+                size=node_size,
                 hover_hints=[item.title[:30] if item.title else domain]
             )
 

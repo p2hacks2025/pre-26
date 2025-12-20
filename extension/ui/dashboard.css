@@ -6,7 +6,7 @@
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-image: url('../assets/bg_night_sky.jpg');
+  background-image: url('../assets/bg_night_sky.svg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
@@ -19,8 +19,8 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 15px 20px;
+  background: rgba(72, 92, 112, 1);
+  padding: 25px 20px;
   display: flex;
   align-items: center;
   gap: 20px;
@@ -29,7 +29,8 @@ body {
 }
 
 #controls h1 {
-  font-size: 1.5rem;
+  font-size: 2.0rem;
+  font-family: "Hirakaku ProN W3", sans-serif;
   margin-right: auto;
 }
 
@@ -96,11 +97,11 @@ body {
 
 #sidebar {
   position: fixed;
-  top: 70px;
+  top: 100px;
   right: 0;
   width: 300px;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(72, 92, 112, 1);
   padding: 20px;
   overflow-y: auto;
   backdrop-filter: blur(10px);

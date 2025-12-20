@@ -1,6 +1,7 @@
 # P2HACKS2025 アピールシート
 
 ## プロダクト名
+KiraNavi
 <img width="1920" height="1080" alt="consept" src="https://github.com/user-attachments/assets/950eae12-bfea-403c-98a7-520749eddc0e" />
 
 

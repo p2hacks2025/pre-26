@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "SparkNavi",
+  "name": "KiraNavi",
   "version": "1.0.0",
   "description": "ブラウザ履歴をネットワークグラフとして可視化",
   "permissions": [
     "history"
   ],
   "action": {
-    "default_title": "SparkNavi"
+    "default_title": "KiraNavi"
   },
   "background": {
     "service_worker": "background/service_worker.js"

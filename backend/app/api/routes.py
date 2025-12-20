@@ -46,7 +46,7 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
             # 仮の座標（後でレイアウト計算で上書き）
             nodes_dict[node_id] = Node(
                 id=node_id,
-                url=f"https://{domain}",
+                url=item.url,
                 label=domain,
                 x=0.0,
                 y=0.0,

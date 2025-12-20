@@ -73,10 +73,9 @@ export function updateNodeHighlight(nodes, selectedNodes) {
   selectedNodes.forEach((selectedNode) => {
     const index = nodes.findIndex((n) => n.id === selectedNode.id);
     if (index !== -1) {
-      sizes[index] = Math.max(10, nodes[index].size) * 1.5;
-      colors[index] = "rgba(224, 188, 237, 1)";
-      lines[index] = "rgba(222, 201, 230, 1)";
-
+      sizes[index] = Math.max(10, nodes[index].size) * 0.8;
+      colors[index] = "rgba(219, 105, 60, 1)";
+      lines[index] = "rgba(219, 105, 60, 1)";
     }
   });
 

@@ -9,6 +9,14 @@
 <body>
   <div id="controls">
     <h1>SparkNavi</h1>
+
+    <!-- 選択ノード表示（サイドバーから移動） -->
+    <div id="selected-nodes">
+      <span id="selected-node-1" class="selected-node-label">未選択</span>
+      <span class="arrow">→</span>
+      <span id="selected-node-2" class="selected-node-label">未選択</span>
+    </div>
+
     <div class="control-group">
       <label for="range-select">解析範囲:</label>
       <select id="range-select">
@@ -19,6 +27,7 @@
       </select>
       <button id="sync-btn">同期</button>
     </div>
+
     <div id="status"></div>
   </div>
 
@@ -34,12 +43,7 @@
     <div id="suggest-section">
       <h2>次の検索場所を提案</h2>
       <div class="suggest-controls">
-        <p>グラフ上のノードを2つクリックして選択してください</p>
-        <div id="selected-nodes">
-          <span id="selected-node-1" class="selected-node-label">未選択</span>
-          <span class="arrow">→</span>
-          <span id="selected-node-2" class="selected-node-label">未選択</span>
-        </div>
+        <p>最も関連するノードを一つ選んでください</p>
         <button id="reset-selection-btn">選択をリセット</button>
       </div>
       <div id="suggest-status"></div>

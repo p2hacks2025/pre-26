@@ -20,7 +20,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(72, 92, 112, 1);
+  background: #17313E;
   padding: 25px 20px;
   display: flex;
   align-items: center;
@@ -30,8 +30,8 @@ body {
 }
 
 #controls h1 {
-  font-size: 2.0rem;
-  font-family: "Hirakaku ProN W3", sans-serif;
+  font-size: 2.5rem;
+  font-family: "Arial Rounded MT Bold", Arial, sans-serif;
   margin-right: auto;
 }
 
@@ -102,7 +102,7 @@ body {
   right: 0;
   width: 300px;
   bottom: 0;
-  background: rgba(72, 92, 112, 1);
+  background: #17313E;
   padding: 20px;
   overflow-y: auto;
   backdrop-filter: blur(10px);

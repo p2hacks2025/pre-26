@@ -7,6 +7,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from app.config import settings
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +19,7 @@ if settings.GEMINI_API_KEY:
     try:
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
     except Exception:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
 else:
     model = None
 
@@ -77,8 +78,8 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
         response = model.generate_content(prompt)
 
         # レスポンスをパース
-        print(response_text)
         response_text = response.text.strip()
+        print(response_text)
 
         # JSONとして解析を試みる
         try:

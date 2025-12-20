@@ -4,7 +4,7 @@ from app.schemas import (
     SuggestRequest, SuggestResponse, SuggestedNode, SuggestedEdge
 )
 from app.services.graph_store import graph_store
-from app.services.gemini_service import generate_search_keywords, generate_recommend_queries
+from app.services.gemini_service import generate_search_keywords
 from app.services.recommendation_service import generate_next_nodes
 import math
 import logging
@@ -39,10 +39,6 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
             node_id = f"node_{len(seen_domains)}"
             seen_domains[domain] = node_id
 
-            max_size = 100
-            calculated_size = item.visitCount * 30
-            node_size = min(calculated_size, max_size)
-
             # 仮の座標（後でレイアウト計算で上書き）
             nodes_dict[node_id] = Node(
                 id=node_id,
@@ -50,7 +46,7 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
                 label=domain,
                 x=0.0,
                 y=0.0,
-                size=node_size,
+                size=item.visitCount * 5,
                 hover_hints=[item.title[:30] if item.title else domain]
             )
 
@@ -111,23 +107,10 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
         # エラー時は空リストを返す（全体の処理は継続）
         next_nodes = []
 
-    # 閲覧履歴全体から推薦クエリを生成
-    try:
-        queries_data = generate_recommend_queries(
-            history=[item.model_dump() for item in request.history],
-            nodes_dict=nodes_dict,
-            max_queries=3
-        )
-        recommend_queries = [
-            RecommendQuery(query=q["query"], reason=q["reason"])
-            for q in queries_data
-        ]
-    except Exception as e:
-        logger.error(f"Error generating recommend queries: {e}")
-        # エラー時はフォールバッククエリを返す
-        recommend_queries = [
-            RecommendQuery(query="おすすめサイト", reason="閲覧履歴に基づく提案")
-        ]
+    # ダミーのrecommend_queries
+    recommend_queries = [
+        RecommendQuery(query="検索ワード例", reason="頻繁に訪問するサイトに関連")
+    ]
 
     # UUID生成とグラフデータ保存
     session_uuid = graph_store.generate_uuid()

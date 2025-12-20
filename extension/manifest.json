@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "History Visualizer",
+  "name": "SparkNavi",
   "version": "1.0.0",
   "description": "ブラウザ履歴をネットワークグラフとして可視化",
   "permissions": [
     "history"
   ],
   "action": {
-    "default_title": "History Visualizer"
+    "default_title": "SparkNavi"
   },
   "background": {
     "service_worker": "background/service_worker.js"

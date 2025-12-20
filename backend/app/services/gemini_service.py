@@ -1,16 +1,24 @@
 """Gemini API連携サービス"""
 import json
+import logging
 import google.generativeai as genai
 from typing import Optional
 from datetime import datetime
 from urllib.parse import urlparse
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 # Gemini APIの初期化
 if settings.GEMINI_API_KEY:
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    # gemini-2.0-flash-exp: 最新の実験的高速モデル
+    # フォールバック: gemini-1.5-flash
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    except Exception:
+        model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
 
@@ -103,7 +111,7 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
             return keywords
 
     except Exception as e:
-        print(f"Gemini API Error: {e}")
+        logger.error(f"Gemini API Error: {e}")
         # エラー時はフォールバック
         return _generate_fallback_keywords(path_nodes_info)
 
@@ -244,5 +252,168 @@ def generate_next_domain_recommendation(
         return result
 
     except Exception as e:
-        print(f"Gemini recommendation error: {e}")
+        logger.error(f"Gemini recommendation error: {e}")
         return None
+
+
+def generate_recommend_queries(
+    history: list[dict],
+    nodes_dict: dict,
+    max_queries: int = 3,
+    max_history: int = 20
+) -> list[dict]:
+    """閲覧履歴全体から推薦検索クエリを生成
+
+    Args:
+        history: 履歴アイテムのリスト（HistoryItemのdict形式）
+        nodes_dict: ノード辞書 {node_id: Node}
+        max_queries: 生成する最大クエリ数（デフォルト: 3）
+        max_history: プロンプトに含める履歴の最大数（デフォルト: 20）
+
+    Returns:
+        推薦クエリのリスト [{"query": str, "reason": str}, ...]
+    """
+    if not model or not settings.GEMINI_API_KEY:
+        # API keyが設定されていない場合はフォールバック
+        return _generate_fallback_recommend_queries(nodes_dict)
+
+    try:
+        # 最新の履歴を取得（時系列逆順でソート）
+        sorted_history = sorted(
+            history,
+            key=lambda x: x.get("visitTime", 0),
+            reverse=True
+        )[:max_history]
+
+        # ドメインごとの訪問回数を集計
+        domain_counts = {}
+        for item in sorted_history:
+            domain = urlparse(item.get("url", "")).netloc or "unknown"
+            domain_counts[domain] = domain_counts.get(domain, 0) + 1
+
+        # 頻度順にソート（上位5つ）
+        top_domains = sorted(
+            domain_counts.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:5]
+
+        # 履歴リストを作成（タイトル付き）
+        history_lines = []
+        for i, item in enumerate(sorted_history[:15], 1):
+            domain = urlparse(item.get("url", "")).netloc or "unknown"
+            title = item.get("title", domain)[:50]
+            visit_count = item.get("visitCount", 1)
+            history_lines.append(f"{i}. {domain} - {title} (訪問回数: {visit_count})")
+
+        history_text = "\n".join(history_lines)
+
+        # 頻出ドメインリスト
+        top_domains_text = "\n".join([f"- {domain} (訪問回数: {count})" for domain, count in top_domains])
+
+        prompt = f"""あなたはユーザーのWeb閲覧履歴を分析するAIアシスタントです。
+
+ユーザーの最近の閲覧履歴（新しい順）:
+{history_text}
+
+頻繁に訪問しているサイト:
+{top_domains_text}
+
+この閲覧パターンから、ユーザーの関心事や調査テーマを分析し、次に検索すべき具体的なキーワードを{max_queries}つ提案してください。
+
+要件:
+1. 閲覧履歴全体からユーザーの関心領域を推測する
+2. 既に訪問したサイトの内容を深掘りするキーワードを提案
+3. 検索エンジンで実際に使える具体的なキーワード（2〜5単語程度）
+4. 各キーワードの推薦理由を簡潔に（30文字以内、日本語）
+5. 技術者向けの専門的なキーワードも含める
+
+出力形式（JSONのみ、説明文不要）:
+[
+  {{"query": "キーワード1", "reason": "推薦理由"}},
+  {{"query": "キーワード2", "reason": "推薦理由"}},
+  {{"query": "キーワード3", "reason": "推薦理由"}}
+]"""
+
+        # Gemini APIを呼び出し
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+
+        # JSONパース（コードブロック除去）
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+            if response_text.startswith("json"):
+                response_text = response_text[4:]
+            response_text = response_text.strip()
+
+        queries = json.loads(response_text)
+
+        # バリデーション
+        if not isinstance(queries, list):
+            queries = [queries]
+
+        # 各要素が正しい形式かチェック
+        valid_queries = []
+        for q in queries:
+            if isinstance(q, dict) and "query" in q and "reason" in q:
+                valid_queries.append({
+                    "query": str(q["query"])[:100],  # 最大100文字に制限
+                    "reason": str(q["reason"])[:100]
+                })
+
+        # 最大数に制限
+        valid_queries = valid_queries[:max_queries]
+
+        # 空の場合はフォールバック
+        if not valid_queries:
+            return _generate_fallback_recommend_queries(nodes_dict)
+
+        return valid_queries
+
+    except Exception as e:
+        logger.error(f"Gemini recommend queries error: {e}")
+        # エラー時はフォールバック
+        return _generate_fallback_recommend_queries(nodes_dict)
+
+
+def _generate_fallback_recommend_queries(nodes_dict: dict) -> list[dict]:
+    """Gemini APIが使えない場合のフォールバック推薦クエリ生成
+
+    Args:
+        nodes_dict: ノード辞書 {node_id: Node}
+
+    Returns:
+        シンプルな推薦クエリのリスト
+    """
+    if not nodes_dict or len(nodes_dict) == 0:
+        return [
+            {"query": "おすすめサイト", "reason": "閲覧履歴に基づく提案"},
+            {"query": "関連情報", "reason": "興味のある分野の情報"},
+            {"query": "最新トレンド", "reason": "話題のトピック"}
+        ]
+
+    # ノードからドメインを抽出（訪問回数が多い順にソート）
+    nodes = sorted(
+        nodes_dict.values(),
+        key=lambda n: n.size,
+        reverse=True
+    )
+
+    queries = []
+
+    # 上位3つのドメインから推薦クエリを生成
+    for i, node in enumerate(nodes[:3]):
+        domain_label = node.label
+        queries.append({
+            "query": f"{domain_label} 使い方",
+            "reason": "頻繁に訪問するサイトに関連"
+        })
+
+    # 3つ未満の場合は汎用的なクエリで補填
+    while len(queries) < 3:
+        queries.append({
+            "query": "おすすめ情報",
+            "reason": "閲覧パターンに基づく提案"
+        })
+
+    return queries[:3]

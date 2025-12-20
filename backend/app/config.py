@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
 
     class Config:
-        env_file = ".env"
+        # プロジェクトルートとbackend直下の両方から環境変数を読み込む
+        env_file = (".env", "../.env")
         env_file_encoding = "utf-8"
 
 

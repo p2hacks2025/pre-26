@@ -1,30 +1,25 @@
 """Gemini API連携サービス"""
 import json
 import logging
-import google.generativeai as genai
 from typing import Optional
 from datetime import datetime
 from urllib.parse import urlparse
-from app.config import settings
+
+from app.clients.gemini import GeminiClient, default_gemini_client
 
 
 logger = logging.getLogger(__name__)
 
 
-# Gemini APIの初期化
-if settings.GEMINI_API_KEY:
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    # gemini-2.0-flash-exp: 最新の実験的高速モデル
-    # フォールバック: gemini-1.5-flash
-    try:
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except Exception:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
-else:
-    model = None
+def _resolve_client(client: Optional[GeminiClient]) -> GeminiClient:
+    """DI経由のクライアントが無い場合はデフォルトを返す."""
+    return client or default_gemini_client
 
 
-def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
+def generate_search_keywords(
+    path_nodes_info: list[dict],
+    client: Optional[GeminiClient] = None,
+) -> list[str]:
     """パス上のノード情報から検索キーワードを生成
 
     Args:
@@ -34,7 +29,9 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
     Returns:
         検索キーワードのリスト（最大3つ）
     """
-    if not model or not settings.GEMINI_API_KEY:
+    client = _resolve_client(client)
+
+    if not client.is_available:
         # API keyが設定されていない場合はフォールバック
         return _generate_fallback_keywords(path_nodes_info)
 
@@ -50,8 +47,6 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
             f"- {node['label']} ({node['hover_hints'][0] if node.get('hover_hints') else ''}): {node['url']}" 
             for node in path_nodes_info
         ])
-
-        print(f"Geminiに送る経路: {path_labels}") # デバッグ用
 
         prompt = f"""
 ユーザーは以下の経路でWebサイトを閲覧しました：
@@ -74,12 +69,9 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
 例: ["キーワード1", "キーワード2", "キーワード3"]
 """
 
-        # Gemini APIを呼び出し
-        response = model.generate_content(prompt)
-
-        # レスポンスをパース
-        response_text = response.text.strip()
-        print(response_text)
+        response_text = client.generate_content(prompt)
+        if not response_text:
+            return _generate_fallback_keywords(path_nodes_info)
 
         # JSONとして解析を試みる
         try:
@@ -177,7 +169,8 @@ def classify_time_period_jp(timestamp: int) -> str:
 def generate_next_domain_recommendation(
     history: list[dict],
     current_time: int,
-    max_history: int = 10
+    max_history: int = 10,
+    client: Optional[GeminiClient] = None,
 ) -> Optional[dict]:
     """最近の閲覧履歴から次に訪問しそうなドメインを推薦
 
@@ -190,7 +183,8 @@ def generate_next_domain_recommendation(
         推薦結果: {"domain": str, "reason": str, "confidence": float}
         失敗時はNone
     """
-    if not model or not settings.GEMINI_API_KEY:
+    client = _resolve_client(client)
+    if not client.is_available:
         return None
 
     try:
@@ -237,9 +231,9 @@ def generate_next_domain_recommendation(
   "confidence": 0.8
 }}"""
 
-        # Gemini APIを呼び出し
-        response = model.generate_content(prompt)
-        response_text = response.text.strip()
+        response_text = client.generate_content(prompt)
+        if not response_text:
+            return None
 
         # JSONパース（既存のコードと同様の処理）
         if response_text.startswith("```"):
@@ -272,7 +266,8 @@ def generate_recommend_queries(
     history: list[dict],
     nodes_dict: dict,
     max_queries: int = 3,
-    max_history: int = 20
+    max_history: int = 20,
+    client: Optional[GeminiClient] = None,
 ) -> list[dict]:
     """閲覧履歴全体から推薦検索クエリを生成
 
@@ -285,7 +280,8 @@ def generate_recommend_queries(
     Returns:
         推薦クエリのリスト [{"query": str, "reason": str}, ...]
     """
-    if not model or not settings.GEMINI_API_KEY:
+    client = _resolve_client(client)
+    if not client.is_available:
         # API keyが設定されていない場合はフォールバック
         return _generate_fallback_recommend_queries(nodes_dict)
 
@@ -347,9 +343,9 @@ def generate_recommend_queries(
   {{"query": "キーワード3", "reason": "推薦理由"}}
 ]"""
 
-        # Gemini APIを呼び出し
-        response = model.generate_content(prompt)
-        response_text = response.text.strip()
+        response_text = client.generate_content(prompt)
+        if not response_text:
+            return _generate_fallback_recommend_queries(nodes_dict)
 
         # JSONパース（コードブロック除去）
         if response_text.startswith("```"):

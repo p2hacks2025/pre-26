@@ -24,6 +24,121 @@ const resetSelectionBtn = document.getElementById("reset-selection-btn");
 const selectedNode1Label = document.getElementById("selected-node-1");
 const selectedNode2Label = document.getElementById("selected-node-2");
 
+// localStorage関連の定数とユーティリティ関数
+const RECOMMENDATION_HISTORY_KEY = "sparknavi_recommendation_history";
+
+/**
+ * 推薦履歴をlocalStorageに保存
+ * @param {Array} recommendations - { query, reason } の配列
+ * @param {string} timeString - 時刻文字列（例: "14:30"）
+ */
+function saveRecommendationToHistory(recommendations, timeString) {
+  try {
+    const history = loadRecommendationHistory();
+    const newEntry = {
+      timestamp: new Date().toISOString(),
+      timeString: timeString,
+      recommendations: recommendations
+    };
+
+    // 新しいエントリを先頭に追加
+    history.unshift(newEntry);
+
+    // 最大50件まで保存（古いものから削除）
+    if (history.length > 50) {
+      history.splice(50);
+    }
+
+    localStorage.setItem(RECOMMENDATION_HISTORY_KEY, JSON.stringify(history));
+  } catch (error) {
+    console.error("Failed to save recommendation history:", error);
+  }
+}
+
+/**
+ * localStorageから推薦履歴を読み込み
+ * @returns {Array} 推薦履歴の配列
+ */
+function loadRecommendationHistory() {
+  try {
+    const stored = localStorage.getItem(RECOMMENDATION_HISTORY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error("Failed to load recommendation history:", error);
+    return [];
+  }
+}
+
+/**
+ * 推薦履歴をlocalStorageから削除
+ */
+function clearRecommendationHistory() {
+  try {
+    localStorage.removeItem(RECOMMENDATION_HISTORY_KEY);
+  } catch (error) {
+    console.error("Failed to clear recommendation history:", error);
+  }
+}
+
+/**
+ * 推薦履歴をDOMに復元
+ */
+function restoreRecommendationHistory() {
+  const history = loadRecommendationHistory();
+
+  if (history.length === 0) {
+    return;
+  }
+
+  // 履歴を古い順にDOMに追加（最終的に新しいものが上に来る）
+  history.reverse().forEach(entry => {
+    // タイムスタンプセパレーターを作成
+    const separator = document.createElement("div");
+    separator.className = "recommendation-separator";
+    separator.textContent = `${entry.timeString} の推薦`;
+    previousRecommendList.appendChild(separator);
+
+    // 推薦アイテムを作成
+    entry.recommendations.forEach(rec => {
+      const li = document.createElement("li");
+      const isAISuggestion = rec.reason && rec.reason.includes("🤖");
+      if (isAISuggestion) {
+        li.classList.add("ai-suggestion");
+      }
+      li.innerHTML = `
+        <span class="query-text">${rec.query}</span>
+        <span class="query-reason">${rec.reason}</span>
+      `;
+      li.addEventListener("click", () => {
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(rec.query)}`, "_blank");
+      });
+      previousRecommendList.appendChild(li);
+    });
+  });
+
+  // セクションを表示
+  if (history.length > 0) {
+    previousRecommendSection.style.display = "block";
+  }
+}
+
+/**
+ * リスト要素から推薦データを抽出
+ * @param {HTMLElement} listElement - UL要素
+ * @returns {Array} { query, reason } の配列
+ */
+function extractRecommendationsFromList(listElement) {
+  const recommendations = [];
+  Array.from(listElement.children).forEach(child => {
+    const queryText = child.querySelector('.query-text')?.textContent;
+    const queryReason = child.querySelector('.query-reason')?.textContent;
+    if (queryText && queryReason) {
+      recommendations.push({ query: queryText, reason: queryReason });
+    }
+  });
+  return recommendations;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   syncBtn.addEventListener("click", handleSync);
   resetSelectionBtn.addEventListener("click", resetNodeSelection);
@@ -32,6 +147,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (savedUuid) {
     console.log("Session UUID restored:", savedUuid);
   }
+
+  // 保存されている推薦履歴を復元
+  restoreRecommendationHistory();
+  console.log("Recommendation history restored from localStorage");
 });
 
 async function handleSync() {
@@ -152,6 +271,10 @@ function resetNodeSelection() {
   // 以前のおすすめセクションをクリアして非表示に
   previousRecommendList.innerHTML = "";
   previousRecommendSection.style.display = "none";
+
+  // localStorageから推薦履歴を削除
+  clearRecommendationHistory();
+  console.log("Recommendation history cleared from localStorage");
 }
 
 async function handleSuggest() {
@@ -178,12 +301,18 @@ async function handleSuggest() {
 
     // 既存のおすすめを「以前のおすすめ」に追加（上書きではなく追加）
     if (recommendList.children.length > 0) {
+      // 現在の推薦をデータとして抽出
+      const currentRecommendations = extractRecommendationsFromList(recommendList);
+
       // タイムスタンプセパレーターを追加
       const separator = document.createElement("div");
       separator.className = "recommendation-separator";
       const now = new Date();
       const timeString = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
       separator.textContent = `${timeString} の推薦`;
+
+      // localStorageに保存
+      saveRecommendationToHistory(currentRecommendations, timeString);
 
       // 既存の内容の前に挿入（新しいものが上に来るように）
       previousRecommendList.insertBefore(separator, previousRecommendList.firstChild);

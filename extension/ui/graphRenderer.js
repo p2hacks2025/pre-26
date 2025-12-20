@@ -14,6 +14,7 @@ export function renderGraph(element, data, onNodeClick) {
     textfont: { color: "rgba(72,94,112,1)", size: 10 },
     marker: {
       size: nodes.map((n) => Math.max(10, n.size)),
+      symbol: "star",
       line: { width: 2, color: "rgba(241, 207, 194, 1)" }
     },
     hoverinfo: "text",

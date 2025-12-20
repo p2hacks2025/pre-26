@@ -164,6 +164,9 @@ function resetNodeSelection() {
   }
   suggestStatus.textContent = "";
   suggestList.innerHTML = "";
+
+  // おすすめ検索ワードもリセット
+  renderRecommendations(recommendList, []);
 }
 
 async function handleSuggest() {

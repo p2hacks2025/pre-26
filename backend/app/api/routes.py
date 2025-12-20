@@ -4,9 +4,12 @@ from app.schemas import (
     SuggestRequest, SuggestResponse, SuggestedNode, SuggestedEdge
 )
 from app.services.graph_store import graph_store
-from app.services.gemini_service import generate_search_keywords
+from app.services.gemini_service import generate_search_keywords, generate_recommend_queries
 from app.services.recommendation_service import generate_next_nodes
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -100,14 +103,27 @@ async def analyze_history(request: AnalyzeRequest) -> AnalyzeResponse:
             max_candidates=1
         )
     except Exception as e:
-        print(f"Error generating next nodes: {e}")
+        logger.error(f"Error generating next nodes: {e}")
         # エラー時は空リストを返す（全体の処理は継続）
         next_nodes = []
 
-    # ダミーのrecommend_queries
-    recommend_queries = [
-        RecommendQuery(query="検索ワード例", reason="頻繁に訪問するサイトに関連")
-    ]
+    # 閲覧履歴全体から推薦クエリを生成
+    try:
+        queries_data = generate_recommend_queries(
+            history=[item.model_dump() for item in request.history],
+            nodes_dict=nodes_dict,
+            max_queries=3
+        )
+        recommend_queries = [
+            RecommendQuery(query=q["query"], reason=q["reason"])
+            for q in queries_data
+        ]
+    except Exception as e:
+        logger.error(f"Error generating recommend queries: {e}")
+        # エラー時はフォールバッククエリを返す
+        recommend_queries = [
+            RecommendQuery(query="おすすめサイト", reason="閲覧履歴に基づく提案")
+        ]
 
     # UUID生成とグラフデータ保存
     session_uuid = graph_store.generate_uuid()

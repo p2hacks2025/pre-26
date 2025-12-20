@@ -10,6 +10,7 @@ from typing import Optional
 from collections import Counter, defaultdict
 import math
 
+from app.clients.gemini import GeminiClient
 from app.schemas import HistoryItem, Node, PathItem, NextNode
 
 
@@ -527,7 +528,8 @@ def generate_next_nodes(
     nodes_dict: dict[str, Node],
     path: list[PathItem],
     current_time: int,
-    max_candidates: int = 1
+    max_candidates: int = 1,
+    gemini_client: Optional[GeminiClient] = None,
 ) -> list[NextNode]:
     """
     履歴パターン、時間帯、Gemini AIを統合して次の推薦ノードを生成する。
@@ -573,7 +575,10 @@ def generate_next_nodes(
     ]
 
     gemini_candidate = generate_next_domain_recommendation(
-        history_dicts, current_time, max_history=10
+        history_dicts,
+        current_time,
+        max_history=10,
+        client=gemini_client,
     )
 
     # Step 4: スコア統合

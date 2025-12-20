@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from . import analyze, suggest
 
 router = APIRouter(prefix="/api")
-router.include_router(analyze.router, prefix="/v1")
-router.include_router(suggest.router, prefix="/v1")
+router.include_router(analyze.router)
+router.include_router(suggest.router)
 
 __all__ = ["router"]

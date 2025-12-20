@@ -1,18 +1,19 @@
-"""Shared dependencies for API routes.
+"""API依存関係"""
 
-Modules importing this file should only declare lightweight dependency
-functions (e.g., retrieving services, repositories, or config instances).
-Concrete implementations will be wired during app startup.
-"""
+from __future__ import annotations
 
 from typing import Annotated
+
 from fastapi import Depends
 
-# Placeholder dependency example; will be replaced with real wiring later.
+from app.clients.gemini import GeminiClient, default_gemini_client
 
-def get_dummy_service() -> str:
-    return "placeholder"
 
-DummyService = Annotated[str, Depends(get_dummy_service)]
+def get_gemini_client() -> GeminiClient:
+    """Geminiクライアントのシングルトンを返す."""
+    return default_gemini_client
 
-__all__ = ["DummyService", "get_dummy_service"]
+
+GeminiClientDep = Annotated[GeminiClient, Depends(get_gemini_client)]
+
+__all__ = ["GeminiClientDep", "get_gemini_client"]

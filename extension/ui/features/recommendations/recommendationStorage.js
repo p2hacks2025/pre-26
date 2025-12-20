@@ -5,7 +5,7 @@
  * Provides centralized access to recommendation history persistence.
  */
 
-import { RECOMMENDATION_HISTORY_KEY, MAX_RECOMMENDATION_HISTORY } from "./constants.js";
+import { RECOMMENDATION_HISTORY_KEY, MAX_RECOMMENDATION_HISTORY } from "../../core/constants.js";
 
 /**
  * Save a new recommendation entry to localStorage history

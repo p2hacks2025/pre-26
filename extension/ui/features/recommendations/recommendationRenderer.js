@@ -5,7 +5,7 @@
  * Consolidates duplicate rendering logic from multiple files.
  */
 
-import { AI_SUGGESTION_MARKER } from "./constants.js";
+import { AI_SUGGESTION_MARKER } from "../../core/constants.js";
 
 /**
  * Create a single recommendation list item element

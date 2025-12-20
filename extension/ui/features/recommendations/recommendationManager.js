@@ -7,7 +7,7 @@
 
 import { saveRecommendationHistory, loadRecommendationHistory, clearRecommendationHistory } from "./recommendationStorage.js";
 import { renderRecommendationList, renderHistorySection, extractRecommendationsFromList } from "./recommendationRenderer.js";
-import { AI_SUGGESTION_LABEL } from "./constants.js";
+import { AI_SUGGESTION_LABEL } from "../../core/constants.js";
 
 /**
  * Archive current recommendations to history

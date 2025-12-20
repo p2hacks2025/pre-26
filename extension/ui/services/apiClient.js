@@ -1,4 +1,4 @@
-import { API_ANALYZE_URL, API_SUGGEST_URL } from "./constants.js";
+import { API_ANALYZE_URL, API_SUGGEST_URL } from "../core/constants.js";
 
 export async function requestAnalysis(history, hours) {
   const currentTime = Math.floor(Date.now());

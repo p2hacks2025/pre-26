@@ -1,7 +1,7 @@
-import { fetchHistory } from "./historyProvider.js";
-import { requestAnalysis, requestSuggestions } from "./apiClient.js";
-import { renderGraph, updateNodeHighlight } from "./graphRenderer.js";
-import { renderRecommendations } from "./sidebar.js";
+import { fetchHistory } from "./services/historyProvider.js";
+import { requestAnalysis, requestSuggestions } from "./services/apiClient.js";
+import { renderGraph, updateNodeHighlight } from "./features/graph/graphRenderer.js";
+import { renderRecommendations } from "./features/recommendations/sidebar.js";
 import {
   getCurrentData,
   setCurrentData,
@@ -11,14 +11,14 @@ import {
   setSelectedNodes,
   resetSelections,
   resetSuggestedNodesData
-} from "./state.js";
-import { clearRecommendationHistory } from "./recommendationStorage.js";
-import { renderRecommendationList } from "./recommendationRenderer.js";
+} from "./core/state.js";
+import { clearRecommendationHistory } from "./features/recommendations/recommendationStorage.js";
+import { renderRecommendationList } from "./features/recommendations/recommendationRenderer.js";
 import {
   archiveCurrentRecommendations,
   restoreRecommendationHistory,
   formatAISuggestions
-} from "./recommendationManager.js";
+} from "./features/recommendations/recommendationManager.js";
 
 const syncBtn = document.getElementById("sync-btn");
 const rangeSelect = document.getElementById("range-select");
@@ -84,7 +84,7 @@ async function handleSync() {
 
 async function loadMockData() {
   try {
-    const response = await fetch("mock_response.json");
+    const response = await fetch("mocks/mock_response.json");
     const data = await response.json();
     setCurrentData(data);
     renderGraph(graphEl, data, handleNodeClick);

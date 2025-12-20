@@ -1,4 +1,4 @@
-import { MAX_HISTORY_ITEMS } from "./constants.js";
+import { MAX_HISTORY_ITEMS } from "../core/constants.js";
 
 export async function fetchHistory(hours) {
   const endTime = Date.now();

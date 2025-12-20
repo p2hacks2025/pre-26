@@ -16,7 +16,7 @@ if settings.GEMINI_API_KEY:
     # gemini-2.0-flash-exp: 最新の実験的高速モデル
     # フォールバック: gemini-1.5-flash
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
     except Exception:
         model = genai.GenerativeModel('gemini-1.5-flash')
 else:
@@ -38,9 +38,19 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
         return _generate_fallback_keywords(path_nodes_info)
 
     try:
-        # プロンプトを構築
-        path_labels = " → ".join([node['label'] for node in path_nodes_info])
-        path_urls = "\n".join([f"- {node['label']}: {node['url']}" for node in path_nodes_info])
+        # hover_hintsの最初の要素（タイトルなど）を含めて経路を作成
+        path_labels = " → ".join([
+            f"{node['label']} ({node['hover_hints'][0] if node.get('hover_hints') else ''})" 
+            for node in path_nodes_info
+        ])
+        
+        # 詳細リストにもタイトルとURLを両方含める
+        path_urls = "\n".join([
+            f"- {node['label']} ({node['hover_hints'][0] if node.get('hover_hints') else ''}): {node['url']}" 
+            for node in path_nodes_info
+        ])
+
+        print(f"Geminiに送る経路: {path_labels}") # デバッグ用
 
         prompt = f"""
 ユーザーは以下の経路でWebサイトを閲覧しました：
@@ -67,6 +77,7 @@ def generate_search_keywords(path_nodes_info: list[dict]) -> list[str]:
         response = model.generate_content(prompt)
 
         # レスポンスをパース
+        print(response_text)
         response_text = response.text.strip()
 
         # JSONとして解析を試みる

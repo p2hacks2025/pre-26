@@ -1,7 +1,7 @@
 # P2HACKS2025 アピールシート
 
 ## プロダクト名
-SparkNavi
+KiraNavi
 
 ## コンセプト
 

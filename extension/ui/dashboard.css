@@ -7,8 +7,9 @@
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-image: url('../assets/bg_night_sky.svg');
-  background-size: cover;
-  background-position: center;
+  background-size: 80%;
+  background-repeat: no-repeat;
+  background-position: left bottom;
   background-attachment: fixed;
   min-height: 100vh;
   color: #fff;

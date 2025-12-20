@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.deps import GeminiClientDep
+from app.api.deps import GeminiClientDep, GraphStoreDep
 
 from app.schemas import (
     AnalyzeRequest,
@@ -14,7 +14,6 @@ from app.schemas import (
     PathItem,
     RecommendQuery,
 )
-from app.services.graph_store import graph_store
 from app.services.recommendation_service import generate_next_nodes
 
 router = APIRouter(tags=["analyze"])
@@ -24,6 +23,7 @@ router = APIRouter(tags=["analyze"])
 async def analyze_history(
     request: AnalyzeRequest,
     gemini_client: GeminiClientDep,
+    graph_store: GraphStoreDep,
 ) -> AnalyzeResponse:
     """履歴データを解析してネットワークグラフ用データを返す。"""
     import networkx as nx

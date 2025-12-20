@@ -8,6 +8,9 @@ from typing import Protocol, Any, Dict, Optional
 class GraphStoreRepository(Protocol):
     """Protocol describing basic graph storage operations."""
 
+    def generate_uuid(self) -> str:
+        ...
+
     def save(self, session_uuid: str, graph_data: Dict[str, Any]) -> None:
         ...
 

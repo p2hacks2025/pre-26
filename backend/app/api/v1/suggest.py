@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.deps import GeminiClientDep
+from app.api.deps import GeminiClientDep, GraphStoreDep
 
 from app.schemas import (
     SuggestRequest,
@@ -16,7 +16,6 @@ from app.schemas import (
     SuggestedNode,
 )
 from app.services.gemini_service import generate_search_keywords
-from app.services.graph_store import graph_store
 
 router = APIRouter(tags=["suggest"])
 
@@ -25,6 +24,7 @@ router = APIRouter(tags=["suggest"])
 async def suggest_next_nodes(
     request: SuggestRequest,
     gemini_client: GeminiClientDep,
+    graph_store: GraphStoreDep,
 ) -> SuggestResponse:
     """次に検索すべき場所を提案する。"""
     graph_data = graph_store.get(request.uuid)

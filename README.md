@@ -15,7 +15,7 @@ Chromeブラウザに拡張機能をインストール。
 
 
 ## スクリーンショット(任意)
-ここにはスクリーンショットを貼ります。そのままでもよいですし、画像を編集しておしゃれにしてもよいです(全くの捏造というのはしないでください)。GitHubのエディタに画像をドロップ&ドロップすると張り付きます。
+<img width="2845" height="1504" alt="image" src="https://github.com/user-attachments/assets/f7ac9f33-abeb-4ea5-a728-2b033c4c6f9d" />
 
 ## 開発体制
 

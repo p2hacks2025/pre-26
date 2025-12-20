@@ -162,11 +162,9 @@ function resetNodeSelection() {
   if (dataSet) {
     updateNodeHighlight(dataSet.nodes, getSelectedNodes());
   }
+  // 提案結果のみクリア（おすすめ検索ワードは残す）
   suggestStatus.textContent = "";
   suggestList.innerHTML = "";
-
-  // おすすめ検索ワードもリセット
-  renderRecommendations(recommendList, []);
 }
 
 async function handleSuggest() {

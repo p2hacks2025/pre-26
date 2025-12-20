@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 # Gemini APIの初期化
 if settings.GEMINI_API_KEY:
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    # gemini-2.0-flash-exp: 最新の実験的高速モデル
+    # フォールバック: gemini-1.5-flash
+    try:
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    except Exception:
+        model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     model = None
 

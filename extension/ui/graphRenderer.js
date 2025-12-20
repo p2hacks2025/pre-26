@@ -11,11 +11,10 @@ export function renderGraph(element, data, onNodeClick) {
     type: "scatter",
     text: nodes.map((n) => n.label),
     textposition: "top center",
-    textfont: { color: "#fff", size: 10 },
+    textfont: { color: "rgba(72,94,112,1)", size: 10 },
     marker: {
       size: nodes.map((n) => Math.max(10, n.size)),
-      color: nodes.map((_, i) => `hsl(${(i * 30) % 360}, 70%, 60%)`),
-      line: { width: 2, color: "#fff" }
+      line: { width: 2, color: "rgba(241, 207, 194, 1)" }
     },
     hoverinfo: "text",
     hovertext: nodes.map((n) => `${n.label}\n${n.hover_hints.join(", ")}`)
@@ -37,7 +36,7 @@ export function renderGraph(element, data, onNodeClick) {
     y: pathY,
     mode: "lines",
     type: "scatter",
-    line: { width: 3, color: "#ffcc00", dash: "dot" },
+    line: { width: 3, color: "#C5B0CD", dash: "dot" },
     hoverinfo: "none"
   };
 
@@ -66,19 +65,24 @@ export function updateNodeHighlight(nodes, selectedNodes) {
   if (!graphElement || !nodes?.length) return;
 
   const sizes = nodes.map((n) => Math.max(10, n.size));
-  const colors = nodes.map((_, i) => `hsl(${(i * 30) % 360}, 70%, 60%)`);
+  // const colors = nodes.map((_, i) => `hsl(${(i * 30) % 360}, 70%, 60%)`);
+  const colors = nodes.map((_, i) => "rgba(251, 184, 158, 1)");
+  const lines = nodes.map((_, i) => "rgba(241, 207, 194, 1)");
 
   selectedNodes.forEach((selectedNode) => {
     const index = nodes.findIndex((n) => n.id === selectedNode.id);
     if (index !== -1) {
       sizes[index] = Math.max(10, nodes[index].size) * 1.5;
-      colors[index] = "#ff00ff";
+      colors[index] = "rgba(224, 188, 237, 1)";
+      lines[index] = "rgba(222, 201, 230, 1)";
+
     }
   });
 
   Plotly.restyle(graphElement, {
     "marker.size": [sizes],
-    "marker.color": [colors]
+    "marker.color": [colors],
+    "marker.line.color": [lines]
   }, [2]);
 }
 

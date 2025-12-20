@@ -23,6 +23,7 @@ body {
   background: #17313E;
   padding: 25px 20px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 20px;
   z-index: 100;
@@ -156,4 +157,121 @@ body {
 /* Plotlyグラフの背景を透明に */
 .js-plotly-plot .plotly .bg {
   fill: transparent !important;
+}
+
+/* ====================================
+   選択ノード表示（ヘッダーバー内）
+   ==================================== */
+
+#selected-nodes {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  margin-right: auto;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.selected-node-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  transition: all 0.3s ease;
+}
+
+.selected-node-label.active {
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.arrow {
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: bold;
+}
+
+#status {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: -10px;
+}
+
+/* サイドバーのボタンスタイル */
+.suggest-controls {
+  margin-bottom: 15px;
+}
+
+.suggest-controls p {
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+#reset-selection-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+#reset-selection-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#reset-selection-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 900px) {
+  #selected-nodes {
+    order: 3;
+    margin-right: 0;
+    flex-basis: 100%;
+  }
+
+  .selected-node-label {
+    max-width: 100px;
+  }
+}
+
+@media (max-width: 600px) {
+  #controls {
+    padding: 15px 10px;
+    gap: 10px;
+  }
+
+  #controls h1 {
+    font-size: 1.5rem;
+  }
+
+  #selected-nodes {
+    min-width: 200px;
+    padding: 6px 12px;
+  }
+
+  .selected-node-label {
+    font-size: 0.8rem;
+    max-width: 80px;
+  }
+
+  .control-group {
+    flex-basis: 100%;
+  }
 }

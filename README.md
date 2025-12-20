@@ -22,6 +22,8 @@
 ## 推しポイント
 - 閲覧サイトの相関を分析して可視化
 - 次の検索に最適なキーワードを提案 & クリックするだけですぐ調べられる
+- グラフを通じた新たな検索体験
+  <img width="1920" height="1080" alt="sinkisei" src="https://github.com/user-attachments/assets/039f728e-082e-4a76-9c25-d6824f5089f7" />
 
 ## スクリーンショット(任意)
 <img width="2845" height="1504" alt="image" src="https://github.com/user-attachments/assets/f7ac9f33-abeb-4ea5-a728-2b033c4c6f9d" />

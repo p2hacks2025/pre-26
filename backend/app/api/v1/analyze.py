@@ -33,10 +33,13 @@ async def analyze_history(
     edges: list[Edge] = []
     path: list[PathItem] = []
 
+    # ★追加: 高速検索用のセット
+    existing_edge_keys = set() 
+
     seen_domains: dict[str, str] = {}
     prev_node_id: str | None = None
 
-    for i, item in enumerate(request.history[:request.maxNodes]):
+    for i, item in enumerate(request.history):
         parsed = urlparse(item.url)
         domain = parsed.netloc or "unknown"
 
@@ -45,8 +48,8 @@ async def analyze_history(
             seen_domains[domain] = node_id
 
             max_size = 100
-            calculated_size = item.visitCount * 30
-            node_size = min(calculated_size, max_size)
+            calculated_size = item.visitCount 
+            node_size = int(min(calculated_size, max_size))
 
             nodes_dict[node_id] = Node(
                 id=node_id,
@@ -69,17 +72,19 @@ async def analyze_history(
         )
 
         if prev_node_id and prev_node_id != node_id:
-            edge_exists = any(
-                e.source == prev_node_id and e.target == node_id for e in edges
-            )
-            if not edge_exists:
-                edges.append(
-                    Edge(
-                        source=prev_node_id,
-                        target=node_id,
-                        weight=1,
-                    )
-                )
+                    # ★変更: setを使った高速な重複チェック
+                    edge_key = (prev_node_id, node_id)
+                    
+                    if edge_key not in existing_edge_keys:
+                        edges.append(
+                            Edge(
+                                source=prev_node_id,
+                                target=node_id,
+                                weight=1,
+                            )
+                        )
+                        # ★追加: キーをセットに登録
+                        existing_edge_keys.add(edge_key)
 
         prev_node_id = node_id
 

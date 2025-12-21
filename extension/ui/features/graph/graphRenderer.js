@@ -74,8 +74,8 @@ export function updateNodeHighlight(nodes, selectedNodes) {
     const index = nodes.findIndex((n) => n.id === selectedNode.id);
     if (index !== -1) {
       sizes[index] = Math.max(10, nodes[index].size) * 0.8;
-      colors[index] = "rgba(219, 105, 60, 1)";
-      lines[index] = "rgba(219, 105, 60, 1)";
+      colors[index] = "rgba(185, 77, 34, 1)";
+      lines[index] = "rgba(185, 77, 34, 1)";
     }
   });
 

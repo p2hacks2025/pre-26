@@ -9,8 +9,8 @@ class Node(BaseModel):
     id: str
     url: str
     label: str
-    x: float
-    y: float
+    x: int
+    y: int
     size: int
     hover_hints: list[str]
 
